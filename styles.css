@@ -1,0 +1,753 @@
+/* @settings
+
+name: PDF Reader
+id: pdf-reader
+settings:
+    - 
+        id: pdf-highlight
+        title: Highlights
+        type: heading
+        level: 2
+    -
+        id: pdf-reader-highlight-opacity
+        title: Highlight opacity
+        type: variable-number-slider
+        min: 0
+        max: 1
+        step: 0.01
+        default: 0.2
+    -
+        id: pdf-reader-highlight-padding-vertical-em
+        title: Highlight padding (top & bottom)
+        description: Boldness of highlights (em)
+        type: variable-number-slider
+        min: 0
+        max: 1
+        step: 0.01
+        default: 0.05
+        format: em
+    -
+        id: pdf-reader-highlight-padding-horizontal-em
+        title: Highlight padding (left & right)
+        description: Boldness of highlights (em)
+        type: variable-number-slider
+        min: 0
+        max: 1
+        step: 0.01
+        default: 0.05
+        format: em
+    -
+        id: pdf-reader-highlight-border-radius
+        title: Highlight edge roundness
+        description: Radius of the highlight edge (em). 0 for sharp edges and 0.5 for rounded edges.
+        type: variable-number-slider
+        min: 0
+        max: 0.5
+        step: 0.01
+        default: 0.1
+        format: em
+    - 
+        id: pdf-rect
+        title: Rectanglular selection
+        type: heading
+        level: 2
+    -
+        id: pdf-reader-rect-highlight-opacity
+        title: Rectangle highlight opacity
+        type: variable-number-slider
+        min: 0
+        max: 1
+        step: 0.01
+        default: 1
+    -
+        id: pdf-reader-rect-highlight-border-width
+        title: Rectangle highlight border width (px)
+        type: variable-number-slider
+        min: 1
+        max: 10
+        step: 1
+        default: 2
+        format: px
+    -
+        id: hover-popover
+        title: Hover popovers
+        type: heading
+        level: 2
+    -
+        id: pdf-reader-backlink-popover
+        title: Backlink popovers
+        description: Styles for popovers displayed when hovering over backlinked highlights or rectangular selections in PDF viewer
+        type: heading
+        level: 3
+    -
+        id: pdf-reader-backlink-popover-width
+        title: Backlink popover width (px)
+        type: variable-number-slider
+        min: 100
+        max: 1000
+        step: 10
+        default: 450
+        format: px
+    -
+        id: pdf-reader-backlink-popover-height
+        title: Backlink popover height (px)
+        type: variable-number-slider
+        min: 100
+        max: 1000
+        step: 10
+        default: 400
+        format: px
+    -
+        id: pdf-reader-pdf-link-like-popover
+        title: PDF internal link popovers
+        description: Styles for popovers displayed when hovering over internal links, outline items or thumbnails in PDF viewer
+        type: heading
+        level: 3
+    -
+        id: pdf-reader-pdf-link-like-popover-width
+        title: PDF internal link popover width (px)
+        type: variable-number-slider
+        min: 100
+        max: 1000
+        step: 10
+        default: 450
+        format: px
+    -
+        id: pdf-reader-pdf-link-like-popover-height
+        title: PDF internal link popover height (px)
+        type: variable-number-slider
+        min: 100
+        max: 1000
+        step: 10
+        default: 400
+        format: px
+    - 
+        id: pdf-toolbar
+        title: PDF toolbars
+        type: heading
+        level: 2
+    - 
+        id: hide-pdf-embed-toolbar
+        title: Hide toolbar in PDF embeds with a page specified
+        type: class-toggle
+        default: true
+    - 
+        id: hide-pdf-toolbar-in-hover-editor
+        title: Hide PDF toolbar in Hover Editor
+        type: class-toggle
+        default: true
+    -
+        id: pdf-sidebar
+        title: PDF sidebars
+        type: heading
+        level: 2
+    -
+        id: pdf-reader-sidebar-width
+        title: Sidebar width (px)
+        type: variable-number-slider
+        min: 100
+        max: 1000
+        step: 10
+        default: 140
+        format: px
+    -
+        id: pdf-reader-vim
+        title: Vim keybindings
+        type: heading
+        level: 2
+    -
+        id: pdf-reader-vim-hin
+        title: Hint mode
+        type: heading
+        level: 3
+    - 
+        id: pdf-reader-vim-hint-inverted
+        title: Inverted color scheme
+        type: class-toggle
+        default: false
+*/
+
+:root {
+    --pdf-reader-highlight-padding-default-em: 0.05em;
+}
+
+.hide-pdf-embed-toolbar .pdf-embed[src*="#"] .pdf-toolbar,
+.hide-pdf-embed-toolbar .popover.hover-popover.hover-editor .pdf-embed[src*="#"] .pdf-toolbar {
+    display: none;
+}
+
+.hide-pdf-toolbar-in-hover-editor .popover.hover-popover.hover-editor .view-content>.pdf-toolbar {
+    display: none !important;
+}
+
+/* When hovering over a highlighted text in PDF viewer, highlight the corresponding item in backlink pane */
+.backlink-pane .search-result-file-match.hovered-backlink,
+.backlink-pane .search-result-file-matches:has(.better-search-views-tree) .better-search-views-file-match.hovered-backlink:not(:hover) {
+    background-color: var(--text-selection);
+}
+
+.setting-item.no-border,
+.pdf-reader-settings.vertical-tab-content .setting-item.no-border {
+    border-top: none;
+
+    &.small-padding {
+        padding-top: 0;
+    }
+}
+
+.setting-item-control input.error {
+    border-color: var(--background-modifier-error);
+}
+
+.setting-item-description.error {
+    color: var(--background-modifier-error);
+}
+
+.is-mobile,
+.is-tablet {
+    .pdf-reader-color-palette .pdf-reader-color-palette-item-inner {
+        width: calc(var(--swatch-width) * 0.85);
+        height: calc(var(--swatch-width) * 0.85);
+    }
+}
+
+.pdf-reader-color-palette {
+    user-select: none;
+    -webkit-user-select: none;
+
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+
+    .pdf-reader-color-palette-item {
+        /* Avoid text selections to be cleared when tapping on a color palette item on the mobile app */
+        /* https://github.com/RyotaUshio/obsidian-pdf-reader/issues/169 */
+        user-select: none;
+
+        .pdf-reader-color-palette-item-inner {
+            width: var(--swatch-width);
+            height: var(--swatch-width);
+            border-radius: 50%;
+            border: var(--input-border-width) solid var(--background-modifier-border);
+        }
+    }
+
+    .pdf-reader-color-palette-status-container {
+        padding: var(--size-2-2) var(--size-2-3);
+        color: var(--text-muted);
+        font-size: var(--font-ui-small);
+        text-wrap: nowrap;
+    }
+}
+
+.menu .menu-item.pdf-reader-color-menu-item {
+    padding-left: 0;
+
+    .pdf-reader-color-indicator {
+        border-radius: 50%;
+        border-width: 0;
+        height: var(--size-4-3);
+        width: var(--size-4-3);
+    }
+}
+
+.pdf-toolbar .clickable-icon.is-disabled {
+    background-color: inherit;
+
+    &>svg {
+        color: var(--text-faint);
+    }
+}
+
+/* .pdf-page-input, */
+.pdf-zoom-level-input {
+    width: 6ch;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.pdf-zoom-level-percent {
+    white-space: nowrap;
+    margin-right: var(--size-4-1);
+    font-size: var(--font-ui-small);
+    font-variant-numeric: tabular-nums;
+}
+
+.pdf-reader-settings.vertical-tab-content {
+    padding-top: 0;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.pdf-reader-settings.vertical-tab-content .content {
+    padding-top: var(--size-4-4);
+    padding-bottom: var(--size-4-16);
+    padding-left: var(--size-4-12);
+    padding-right: var(--size-4-12);
+}
+
+
+.pdf-reader-settings .setting-item-description,
+.pdf-reader-modal .setting-item-description {
+    &>p:first-child {
+        margin-top: 0;
+    }
+
+    &>p:last-child {
+        margin-bottom: 0;
+    }
+}
+
+.pdf-reader-settings .ignore-split-setting.setting-item {
+    padding-top: 0;
+}
+
+.annotationLayer .popupContent {
+    &>p:first-child {
+        margin-top: 0;
+    }
+
+    &>p:last-child {
+        margin-bottom: 0;
+    }
+}
+
+.pdf-reader-backlink-highlight-layer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 2;
+    transform-origin: 0 0;
+    pointer-events: none;
+}
+
+.pdf-reader-backlink-highlight-layer .pdf-reader-backlink {
+    position: absolute;
+    pointer-events: auto;
+}
+
+.pdf-reader-backlink-highlight-layer .pdf-reader-backlink.pdf-reader-backlink-selection {
+    box-sizing: content-box;
+    cursor: text;
+}
+
+.pdf-reader-backlink-highlight-layer .rect-highlight {
+    background-color: rgb(var(--text-highlight-bg-rgb));
+    border-radius: var(--radius-m);
+    opacity: 0.2;
+}
+
+body:not(.pdf-reader-backlink-selection-underline) .pdf-reader-backlink-highlight-layer .pdf-reader-backlink.pdf-reader-backlink-selection {
+    background-color: rgb(from var(--pdf-reader-color) r g b / var(--pdf-reader-highlight-opacity, 0.2));
+    padding: var(--pdf-reader-highlight-padding-vertical-em, var(--pdf-reader-highlight-padding-default-em)) var(--pdf-reader-highlight-padding-horizontal-em, var(--pdf-reader-highlight-padding-default-em));
+    margin: calc(var(--pdf-reader-highlight-padding-vertical-em, var(--pdf-reader-highlight-padding-default-em)) * -1) calc(var(--pdf-reader-highlight-padding-horizontal-em, var(--pdf-reader-highlight-padding-default-em)) * -1);
+    border-radius: var(--pdf-reader-highlight-border-radius, 0.1em);
+}
+
+body.pdf-reader-backlink-selection-underline {
+    .pdf-reader-backlink-highlight-layer .pdf-reader-backlink.pdf-reader-backlink-selection {
+        padding: 0;
+        margin: 0;
+        opacity: 1.0;
+        border-radius: 0;
+    }
+
+    .pdf-reader-backlink-highlight-layer[data-main-rotation="0"] .pdf-reader-backlink.pdf-reader-backlink-selection {
+        border-bottom: 0.1em solid var(--pdf-reader-color);
+    }
+
+    .pdf-reader-backlink-highlight-layer[data-main-rotation="90"] .pdf-reader-backlink.pdf-reader-backlink-selection {
+        border-right: 0.1em solid var(--pdf-reader-color);
+    }
+
+    .pdf-reader-backlink-highlight-layer[data-main-rotation="180"] .pdf-reader-backlink.pdf-reader-backlink-selection {
+        border-top: 0.1em solid var(--pdf-reader-color);
+    }
+
+    .pdf-reader-backlink-highlight-layer[data-main-rotation="270"] .pdf-reader-backlink.pdf-reader-backlink-selection {
+        border-left: 0.1em solid var(--pdf-reader-color);
+    }
+}
+
+.pdf-reader-backlink-highlight-layer .pdf-reader-backlink.pdf-reader-backlink-fit-r {
+    border: dashed rgb(from var(--pdf-reader-rect-color) r g b / var(--pdf-reader-rect-highlight-opacity, 1)) var(--pdf-reader-rect-highlight-border-width, 2px);
+}
+
+.pdf-reader-backlink-icon {
+    position: absolute;
+    --icon-size: 100%;
+}
+
+[data-main-rotation="90"] .pdf-reader-backlink-icon {
+    transform: rotate(270deg);
+}
+
+[data-main-rotation="180"] .pdf-reader-backlink-icon {
+    transform: rotate(180deg);
+}
+
+[data-main-rotation="270"] .pdf-reader-backlink-icon {
+    transform: rotate(90deg);
+}
+
+.pdf-reader-annotation-edit-modal {
+    .desc {
+        margin-bottom: var(--size-4-4);
+    }
+
+    .preview-container {
+        background: var(--background-modifier-form-field);
+        border: var(--input-border-width) solid var(--background-modifier-border);
+        border-radius: var(--input-radius);
+        padding: var(--size-4-1) var(--size-4-2);
+        text-align: left;
+
+        &>p:first-child {
+            margin-top: 0;
+        }
+
+        &>p:last-child {
+            margin-bottom: 0;
+        }
+    }
+
+    /* Arrange two children of .setting-item, namely .setting-item-info and .setting-item-contrl, vertically */
+    .setting-item:last-child:has(textarea) {
+        display: flex;
+        flex-direction: column;
+        justify-content: left;
+        align-items: flex-start;
+
+        .setting-item-control {
+            width: 100%;
+            padding-top: var(--size-4-2);
+        }
+    }
+
+    .pdf-reader-annotation-edit-modal-save-instructions {
+        color: var(--text-muted);
+        font-size: calc(var(--font-text-size) * 0.65);
+        text-align: end;
+    }
+}
+
+.popupWrapper {
+    --pdf-popup-width: 310px;
+}
+
+.pdf-reader-annotation-icon-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+
+    margin-right: calc(var(--size-4-1) * -1);
+    margin-left: calc(var(--size-2-1) * -1);
+
+    .clickable-icon {
+        margin-right: 0;
+        margin-left: 0;
+    }
+}
+
+.pdf-reader-draggable .popup {
+    cursor: default;
+}
+
+#pdf-reader-funding {
+    display: flex;
+    flex-direction: column;
+    justify-content: left;
+    align-items: flex-end;
+
+    .setting-item-control {
+        padding-top: var(--size-4-4);
+    }
+}
+
+#pdf-reader-funding-icon-info-container {
+    display: flex;
+    flex-direction: row;
+    /* justify-content: left; */
+    align-items: center;
+}
+
+#pdf-reader-funding-icon {
+    margin-right: var(--size-4-4);
+}
+
+.page-label-range:first-of-type {
+    margin-top: var(--size-4-4);
+}
+
+.page-label-range:not(:first-of-type) {
+    margin-top: var(--size-4-9);
+}
+
+.pdf-reader-page-label-modal {
+    z-index: var(--he-popover-layer-inactive, var(--layer-popover));
+
+    .page-labels-loading {
+        color: var(--text-muted);
+        text-align: center;
+        margin: var(--size-4-4);
+    }
+}
+
+.pdf-reader-restore-default-modal {
+    user-select: text;
+}
+
+.pdf-content-container {
+    --sidebar-width: var(--pdf-reader-sidebar-width, 140px);
+}
+
+body {
+    --container-pdf-cropped-width: var(--line-width);
+    --container-pdf-cropped-max-width: var(--max-width);
+}
+
+.internal-embed.pdf-cropped-embed {
+    width: var(--container-pdf-cropped-width);
+    max-width: var(--container-pdf-cropped-max-width);
+
+    img {
+        cursor: text !important;
+        max-width: 100%;
+    }
+}
+
+.popover.hover-popover>.pdf-cropped-embed img {
+    max-height: 100%;
+    max-width: 100%;
+    height: auto;
+}
+
+.pdf-reader-selecting * {
+    cursor: crosshair !important;
+
+    .textLayer {
+        user-select: none;
+    }
+}
+
+.pdf-container .pdf-reader-select-box {
+    position: absolute;
+    z-index: 1000;
+    border: dashed var(--background-modifier-border) 2px;
+    background-color: hsla(var(--interactive-accent-hsl), 0.15);
+}
+
+/* From Obsidian's app.css (.annotationLayer .mod-focused /  .annotationLayer .boundingRect)*/
+.pdf-reader-annotation-bounding-rect {
+    background-color: rgba(var(--text-highlight-bg-rgb), 0.1);
+    border-radius: var(--radius-s);
+    box-shadow: var(--shadow-s);
+    box-sizing: content-box;
+    margin: calc(var(--size-4-2) * -1);
+    border: var(--size-4-1) solid rgba(var(--text-highlight-bg-rgb), 0.8);
+    padding: var(--size-4-1);
+    z-index: 0;
+    /* Avoid preventing annotation click */
+    position: absolute;
+    pointer-events: none;
+}
+
+.popover.hover-popover.pdf-reader-backlink-popover {
+    --popover-width: var(--pdf-reader-backlink-popover-width, 450px);
+    --popover-height: var(--pdf-reader-backlink-popover-height, 400px);
+}
+
+.popover.hover-popover.pdf-reader-pdf-link-like-popover {
+    --popover-pdf-width: var(--pdf-reader-pdf-link-like-popover-width, 450px);
+    --popover-pdf-height: var(--pdf-reader-pdf-link-like-popover-height, 400px);
+}
+
+.popover.hover-popover.pdf-reader-bib-popover {
+    --popover-width: 400px;
+    --pdf-reader-bib-metadata-font-size: var(--font-ui-small);
+
+    /* Workaround to prevent bib popovers from being covered by Hover Editor
+    when the bib popover is spawned from a hover editor
+    (https://github.com/RyotaUshio/obsidian-pdf-reader/issues/459).
+    Hover Editor decides z-index based on --layer-slides, so we need to set a higher z-index. */
+    z-index: calc(var(--layer-slides) + 1);
+
+    .pdf-reader-bib {
+        padding: var(--size-4-3);
+        font-size: var(--font-ui-medium);
+
+        /* Make text inside citation hover selectable (https://github.com/RyotaUshio/obsidian-pdf-reader/issues/252) */
+        -moz-user-select: text;
+        -webkit-user-select: text;
+        user-select: text;
+
+        .bib-title {
+            font-weight: bold;
+            padding-bottom: var(--size-4-2);
+        }
+
+        .bib-author-year {
+            color: var(--text-muted);
+            text-align: left;
+            font-size: var(--pdf-reader-bib-metadata-font-size);
+        }
+
+        .bib-container-title {
+            color: var(--text-muted);
+            font-style: italic;
+            text-align: left;
+            font-size: var(--pdf-reader-bib-metadata-font-size);
+        }
+
+        .button-container {
+            margin-top: 1em;
+            display: flex;
+            justify-content: space-between;
+            gap: var(--size-4-2);
+            flex-wrap: wrap;
+        }
+    }
+}
+
+.pdf-reader-vim-command {
+    border-top: 1px solid var(--background-modifier-border);
+    /* height: var(--size-4-8); */
+    font-family: monospace;
+
+    input {
+        background: transparent;
+        border: none;
+        outline: none;
+        font-family: monospace;
+        white-space: pre;
+        width: 90%;
+    }
+}
+
+.page.pdf-reader-vim-hint-mode [data-pdf-reader-vim-hint]::after {
+    content: attr(data-pdf-reader-vim-hint);
+    color: var(--pdf-reader-vim-hint-color);
+    text-transform: uppercase;
+    font-size: var(--font-ui-medium);
+    font-weight: bold;
+    background-color: var(--pdf-reader-vim-hint-background-color);
+    border: var(--size-2-1) solid hsl(var(--accent-h), var(--accent-s), var(--accent-l));
+    border-radius: 10%;
+    padding: 0 var(--size-2-2);
+    position: relative;
+    left: 0;
+    top: 0;
+    z-index: 9999;
+}
+
+body {
+    --pdf-reader-vim-hint-color: var(--text-normal);
+    --pdf-reader-vim-hint-background-color: var(--background-primary);
+}
+
+body.pdf-reader-vim-hint-inverted {
+    --pdf-reader-vim-hint-color: var(--text-on-accent);
+    --pdf-reader-vim-hint-background-color: hsl(var(--accent-h), var(--accent-s), var(--accent-l));
+}
+
+.pdf-reader-selection-toolbar {
+    position: fixed;
+    display: flex;
+    flex-direction: row;
+    gap: 12px;
+    padding: 8px 12px;
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    z-index: var(--layer-popover);
+    align-items: center;
+    pointer-events: auto;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.pdf-reader-selection-toolbar-item {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pdf-reader-selection-toolbar-item:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.pdf-reader-selection-toolbar-item-inner {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.pdf-reader-selection-toolbar-item[data-highlight-color="transparent"] .pdf-reader-selection-toolbar-item-inner {
+    background-color: white;
+    border: 2px solid #ddd;
+    box-shadow: none;
+}
+
+.source-note-item {
+    padding: 4px;
+    color: var(--text-muted);
+}
+
+.source-note-item:hover {
+    color: var(--text-normal);
+}
+
+.source-note-item svg {
+    width: 20px;
+    height: 20px;
+}
+
+.pdf-reader-selection-toolbar-source-container {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+.pdf-reader-selection-toolbar-comment-input {
+    background: var(--background-modifier-form-field);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    padding: 2px 8px;
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    width: 120px;
+    height: 24px;
+    outline: none;
+    transition: width 0.2s ease;
+}
+
+.pdf-reader-selection-toolbar-comment-input:focus {
+    border-color: var(--interactive-accent);
+    width: 160px;
+}
+
+/* Dark mode adjustments */
+.theme-dark {
+    .pdf-reader-selection-toolbar {
+        background-color: rgba(24, 24, 24, 0.85);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    }
+    
+    .pdf-reader-selection-toolbar-item[data-highlight-color="transparent"] .pdf-reader-selection-toolbar-item-inner {
+        background-color: #333;
+        border-color: #555;
+    }
+}
