@@ -1,7 +1,7 @@
 {
 	"id": "pdf-reader",
 	"name": "PDF Reader",
-	"version": "1.0.4",
+	"version": "1.0.5",
 	"minAppVersion": "1.5.8",
 	"author": "Lebenswille",
 	"authorUrl": "https://github.com/Lebenswille",
