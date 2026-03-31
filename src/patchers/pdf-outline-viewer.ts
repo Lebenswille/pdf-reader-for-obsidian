@@ -1,26 +1,27 @@
-import { around } from 'monkey-around';
+import { around } from "monkey-around";
 
-import PDFReader from 'main';
-import { onOutlineItemContextMenu } from 'context-menu';
-import { PDFOutlineTreeNode, PDFOutlineViewer } from 'typings';
-
+import PDFReader from "main";
+import { onOutlineItemContextMenu } from "context-menu";
+import { PDFOutlineTreeNode, PDFOutlineViewer } from "typings";
 
 export const patchPDFOutlineViewer = (plugin: PDFReader, pdfOutlineViewer: PDFOutlineViewer) => {
-    plugin.register(around(pdfOutlineViewer.constructor.prototype, {
-        onItemContextMenu(old) {
-            return async function (item: PDFOutlineTreeNode, evt: MouseEvent) {
-                const self = this as PDFOutlineViewer;
-                const child = self.viewer;
-                const file = child.file;
+	plugin.register(
+		around(pdfOutlineViewer.constructor.prototype, {
+			onItemContextMenu(old) {
+				return async function (item: PDFOutlineTreeNode, evt: MouseEvent) {
+					const self = this as PDFOutlineViewer;
+					const child = self.viewer;
+					const file = child.file;
 
-                if (!plugin.settings.outlineContextMenu || !file) {
-                    return await old.call(self, item, evt);
-                }
+					if (!plugin.settings.outlineContextMenu || !file) {
+						return await old.call(self, item, evt);
+					}
 
-                onOutlineItemContextMenu(plugin, child, file, item, evt);
-            };
-        }
-    }));
+					onOutlineItemContextMenu(plugin, child, file, item, evt);
+				};
+			},
+		}),
+	);
 
-    return true;
+	return true;
 };

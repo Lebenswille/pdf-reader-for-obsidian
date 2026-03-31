@@ -1,95 +1,123 @@
-import { Component, DropdownComponent, Events, HexString, IconName, MarkdownRenderer, Modifier, Notice, ObsidianProtocolData, Platform, PluginSettingTab, Setting, TextAreaComponent, TextComponent, debounce, setIcon, setTooltip } from 'obsidian';
+import {
+	Component,
+	DropdownComponent,
+	Events,
+	HexString,
+	IconName,
+	MarkdownRenderer,
+	Modifier,
+	Notice,
+	ObsidianProtocolData,
+	Platform,
+	PluginSettingTab,
+	Setting,
+	TextAreaComponent,
+	TextComponent,
+	debounce,
+	setIcon,
+	setTooltip,
+} from "obsidian";
 
-import PDFReader from 'main';
-import { ExtendedPaneType } from 'lib/workspace-lib';
-import { AutoFocusTarget } from 'lib/copy-link';
-import { CommandSuggest, FuzzyFileSuggest, FuzzyFolderSuggest, FuzzyMarkdownFileSuggest, KeysOfType, getModifierDictInPlatform, getModifierNameInPlatform, isHexString } from 'utils';
-import { InstallerVersionModal } from 'modals';
-import { ScrollMode, SidebarView, SpreadMode } from 'pdfjs-enums';
-import { Menu } from 'obsidian';
-import { PDFExternalLinkPostProcessor, PDFInternalLinkPostProcessor, PDFOutlineItemPostProcessor, PDFThumbnailItemPostProcessor } from 'post-process';
-import { BibliographyManager } from 'bib';
-
+import PDFReader from "main";
+import { ExtendedPaneType } from "lib/workspace-lib";
+import { AutoFocusTarget } from "lib/copy-link";
+import {
+	CommandSuggest,
+	FuzzyFileSuggest,
+	FuzzyFolderSuggest,
+	FuzzyMarkdownFileSuggest,
+	KeysOfType,
+	getModifierDictInPlatform,
+	getModifierNameInPlatform,
+	isHexString,
+} from "utils";
+import { InstallerVersionModal } from "modals";
+import { ScrollMode, SidebarView, SpreadMode } from "pdfjs-enums";
+import { Menu } from "obsidian";
+import {
+	PDFExternalLinkPostProcessor,
+	PDFInternalLinkPostProcessor,
+	PDFOutlineItemPostProcessor,
+	PDFThumbnailItemPostProcessor,
+} from "post-process";
+import { BibliographyManager } from "bib";
 
 const SELECTION_BACKLINK_VISUALIZE_STYLE = {
-	'highlight': 'Highlight',
-	'underline': 'Underline',
+	highlight: "Highlight",
+	underline: "Underline",
 } as const;
 export type SelectionBacklinkVisualizeStyle = keyof typeof SELECTION_BACKLINK_VISUALIZE_STYLE;
 
 const HOVER_HIGHLIGHT_ACTIONS = {
-	'open': 'Open backlink',
-	'preview': 'Popover preview of backlink',
+	open: "Open backlink",
+	preview: "Popover preview of backlink",
 } as const;
 
 const PANE_TYPE: Record<ExtendedPaneType, string> = {
-	'': 'Current tab',
-	'tab': 'New tab',
-	'right': 'Split right',
-	'left': 'Split left',
-	'down': 'Split down',
-	'up': 'Split up',
-	'window': 'New window',
-	'right-sidebar': 'Right sidebar',
-	'left-sidebar': 'Left sidebar'
+	"": "Current tab",
+	tab: "New tab",
+	right: "Split right",
+	left: "Split left",
+	down: "Split down",
+	up: "Split up",
+	window: "New window",
+	"right-sidebar": "Right sidebar",
+	"left-sidebar": "Left sidebar",
 };
 
 const AUTO_FOCUS_TARGETS: Record<AutoFocusTarget, string> = {
-	'last-paste': 'Last-pasted note',
-	'last-active': 'Last-active markdown file',
-	'last-active-and-open': 'Last-active markdown file (only if it is still opened)',
-	'last-paste-then-last-active': 'Last-pasted note (if none, then last-active markdown file)',
-	'last-paste-then-last-active-and-open': 'Last-pasted note (if none, then last-active markdown file, only if it is still opened)',
-	'last-active-and-open-then-last-paste': 'Last-active markdown file (only if it is still opened; if none, then last-pasted note)',
-	'associated-note': 'Associated note',
+	"last-paste": "Last-pasted note",
+	"last-active": "Last-active markdown file",
+	"last-active-and-open": "Last-active markdown file (only if it is still opened)",
+	"last-paste-then-last-active": "Last-pasted note (if none, then last-active markdown file)",
+	"last-paste-then-last-active-and-open":
+		"Last-pasted note (if none, then last-active markdown file, only if it is still opened)",
+	"last-active-and-open-then-last-paste":
+		"Last-active markdown file (only if it is still opened; if none, then last-pasted note)",
+	"associated-note": "Associated note",
 };
 
 const NEW_FILE_LOCATIONS = {
-	'root': 'Vault folder',
-	'current': 'Same folder as current file',
-	'folder': 'In the folder specified below',
+	root: "Vault folder",
+	current: "Same folder as current file",
+	folder: "In the folder specified below",
 } as const;
 type NewFileLocation = keyof typeof NEW_FILE_LOCATIONS;
 
 const NEW_ATTACHMENT_LOCATIONS = {
-	'root': 'Vault folder',
-	'current': 'Same folder as current file',
-	'folder': 'In the folder specified below',
-	'subfolder': 'In subfolder under current folder',
-	'obsidian': 'Same as Obsidian\'s attachment location',
+	root: "Vault folder",
+	current: "Same folder as current file",
+	folder: "In the folder specified below",
+	subfolder: "In subfolder under current folder",
+	obsidian: "Same as Obsidian's attachment location",
 } as const;
 type NewAttachmentLocation = keyof typeof NEW_ATTACHMENT_LOCATIONS;
 
-const IMAGE_EXTENSIONS = [
-	'png',
-	'jpg',
-	'webp',
-	'bmp',
-] as const;
-export type ImageExtension = typeof IMAGE_EXTENSIONS[number];
+const IMAGE_EXTENSIONS = ["png", "jpg", "webp", "bmp"] as const;
+export type ImageExtension = (typeof IMAGE_EXTENSIONS)[number];
 
 export interface NamedTemplate {
 	name: string;
 	template: string;
 }
 
-export const DEFAULT_BACKLINK_HOVER_COLOR = 'green';
+export const DEFAULT_BACKLINK_HOVER_COLOR = "green";
 
 const ACTION_ON_CITATION_HOVER = {
-	'none': 'Same as other internal links',
-	'pdf-reader-bib-popover': 'PDF Reader\'s custom bibliography popover',
-	'google-scholar-popover': 'Google Scholar popover',
+	none: "Same as other internal links",
+	"pdf-reader-bib-popover": "PDF Reader's custom bibliography popover",
+	"google-scholar-popover": "Google Scholar popover",
 } as const;
 
 const MOBILE_COPY_ACTIONS = {
-	'text': 'Copy text',
-	'obsidian': 'Obsidian default (copy as quote)',
-	'pdf-reader': 'Run PDF Reader\'s copy command',
+	text: "Copy text",
+	obsidian: "Obsidian default (copy as quote)",
+	"pdf-reader": "Run PDF Reader's copy command",
 } as const;
 
 export interface PDFReaderSettings {
 	displayTextFormats: NamedTemplate[];
-	defaultDisplayTextFormatIndex: number,
+	defaultDisplayTextFormatIndex: number;
 	syncDisplayTextFormat: boolean;
 	syncDefaultDisplayTextFormat: boolean;
 	copyCommands: NamedTemplate[];
@@ -139,8 +167,8 @@ export interface PDFReaderSettings {
 	paneTypeForFirstMDLeaf: ExtendedPaneType;
 	singleMDLeafInSidebar: boolean;
 	alwaysUseSidebar: boolean;
-	ignoreExistingMarkdownTabIn: ('leftSplit' | 'rightSplit' | 'floatingSplit')[];
-	defaultColorPaletteActionIndex: number,
+	ignoreExistingMarkdownTabIn: ("leftSplit" | "rightSplit" | "floatingSplit")[];
+	defaultColorPaletteActionIndex: number;
 	syncColorPaletteAction: boolean;
 	syncDefaultColorPaletteAction: boolean;
 	proxyMDProperty: string;
@@ -167,11 +195,11 @@ export interface PDFReaderSettings {
 	pdfLinkColor: HexString;
 	pdfLinkBorder: boolean;
 	replaceContextMenu: boolean;
-	showContextMenuOnMouseUpIf: 'always' | 'never' | Modifier;
-	contextMenuConfig: { id: string, visible: boolean }[];
-	selectionProductMenuConfig: ('color' | 'copy-format' | 'display')[];
-	writeFileProductMenuConfig: ('color' | 'copy-format' | 'display')[];
-	annotationProductMenuConfig: ('copy-format' | 'display')[];
+	showContextMenuOnMouseUpIf: "always" | "never" | Modifier;
+	contextMenuConfig: { id: string; visible: boolean }[];
+	selectionProductMenuConfig: ("color" | "copy-format" | "display")[];
+	writeFileProductMenuConfig: ("color" | "copy-format" | "display")[];
+	annotationProductMenuConfig: ("copy-format" | "display")[];
 	updateColorPaletteStateFromContextMenu: boolean;
 	showContextMenuOnTablet: boolean;
 	mobileCopyAction: keyof typeof MOBILE_COPY_ACTIONS;
@@ -215,7 +243,7 @@ export interface PDFReaderSettings {
 	autoFocusTarget: AutoFocusTarget;
 	autoPasteTarget: AutoFocusTarget;
 	openAutoFocusTargetIfNotOpened: boolean;
-	howToOpenAutoFocusTargetIfNotOpened: ExtendedPaneType | 'hover-editor';
+	howToOpenAutoFocusTargetIfNotOpened: ExtendedPaneType | "hover-editor";
 	closeHoverEditorWhenLostFocus: boolean;
 	closeSidebarWhenLostFocus: boolean;
 	openAutoFocusTargetInEditingView: boolean;
@@ -244,7 +272,7 @@ export interface PDFReaderSettings {
 	newPDFLocation: NewFileLocation;
 	newPDFFolderPath: string;
 	rectEmbedStaticImage: boolean;
-	rectImageFormat: 'file' | 'data-url';
+	rectImageFormat: "file" | "data-url";
 	rectImageExtension: ImageExtension;
 	rectEmbedResolution: number;
 	zoomToFitRect: boolean;
@@ -258,10 +286,10 @@ export interface PDFReaderSettings {
 	showBoundingRectForBacklinkedAnnot: boolean;
 	hideReplyAnnotation: boolean;
 	hideStampAnnotation: boolean;
-	searchLinkHighlightAll: 'true' | 'false' | 'default';
-	searchLinkCaseSensitive: 'true' | 'false' | 'default';
-	searchLinkMatchDiacritics: 'true' | 'false' | 'default';
-	searchLinkEntireWord: 'true' | 'false' | 'default';
+	searchLinkHighlightAll: "true" | "false" | "default";
+	searchLinkCaseSensitive: "true" | "false" | "default";
+	searchLinkMatchDiacritics: "true" | "false" | "default";
+	searchLinkEntireWord: "true" | "false" | "default";
 	dontFitWidthWhenOpenPDFLink: boolean;
 	preserveCurrentLeftOffsetWhenOpenPDFLink: boolean;
 	defaultZoomValue: string; // 'page-width' | 'page-height' | 'page-fit' | '<PERCENTAGE>'
@@ -280,7 +308,7 @@ export interface PDFReaderSettings {
 	copyAsSingleLine: boolean;
 	removeWhitespaceBetweenCJChars: boolean;
 	// Follows the same format as Obsidian's "Default location for new attachments
-	// (`attachmentFolderPath`)" option, except for an empty string meaning 
+	// (`attachmentFolderPath`)" option, except for an empty string meaning
 	// following the Obsidian default
 	dummyFileFolderPath: string;
 	externalURIPatterns: string[];
@@ -305,6 +333,7 @@ export interface PDFReaderSettings {
 	fixObsidianTextSelectionBug: boolean;
 	selectionToolbar: boolean;
 	showSelectionToolbarOnMouseUp: boolean;
+	warnBeforeCreateNote: boolean;
 }
 
 export const DEFAULT_SETTINGS: PDFReaderSettings = {
@@ -314,53 +343,53 @@ export const DEFAULT_SETTINGS: PDFReaderSettings = {
 		// 	template: '{{file.basename}}, page {{page}}',
 		// },
 		{
-			name: 'Title & page',
-			template: '{{file.basename}}, p.{{pageLabel}}',
+			name: "Title & page",
+			template: "{{file.basename}}, p.{{pageLabel}}",
 		},
 		{
-			name: 'Page',
-			template: 'p.{{pageLabel}}',
+			name: "Page",
+			template: "p.{{pageLabel}}",
 		},
 		{
-			name: 'Text',
-			template: '{{text}}',
+			name: "Text",
+			template: "{{text}}",
 		},
 		{
-			name: 'Emoji',
-			template: '📖'
+			name: "Emoji",
+			template: "📖",
 		},
 		{
-			name: 'None',
-			template: ''
-		}
+			name: "None",
+			template: "",
+		},
 	],
 	defaultDisplayTextFormatIndex: 0,
 	syncDisplayTextFormat: true,
 	syncDefaultDisplayTextFormat: false,
 	copyCommands: [
 		{
-			name: 'Quote',
-			template: '> ({{linkWithDisplay}})\n> {{text}}\n',
+			name: "Quote",
+			template: "> ({{linkWithDisplay}})\n> {{text}}\n",
 		},
 		{
-			name: 'Link',
-			template: '{{linkWithDisplay}}'
+			name: "Link",
+			template: "{{linkWithDisplay}}",
 		},
 		{
-			name: 'Embed',
-			template: '!{{link}}',
+			name: "Embed",
+			template: "!{{link}}",
 		},
 		{
-			name: 'Callout',
-			template: '> [!{{calloutType}}|{{color}}] {{linkWithDisplay}}\n> {{text}}\n',
+			name: "Callout",
+			template: "> [!{{calloutType}}|{{color}}] {{linkWithDisplay}}\n> {{text}}\n",
 		},
 		{
-			name: 'Quote in callout',
-			template: '> [!{{calloutType}}|{{color}}] {{linkWithDisplay}}\n> > {{text}}\n> \n> ',
-		}
+			name: "Quote in callout",
+			template: "> [!{{calloutType}}|{{color}}] {{linkWithDisplay}}\n> > {{text}}\n> \n> ",
+		},
 	],
 	useAnotherCopyTemplateWhenNoSelection: false,
-	copyTemplateWhenNoSelection: '{{linkToPageWithDisplay}}',
+	copyTemplateWhenNoSelection: "{{linkToPageWithDisplay}}",
 	trimSelectionEmbed: false,
 	embedMargin: 50,
 	noSidebarInEmbed: true,
@@ -370,7 +399,7 @@ export const DEFAULT_SETTINGS: PDFReaderSettings = {
 	highlightExistingTab: false,
 	existingTabHighlightOpacity: 0.5,
 	existingTabHighlightDuration: 0.75,
-	paneTypeForFirstPDFLeaf: 'left',
+	paneTypeForFirstPDFLeaf: "left",
 	openLinkNextToExistingPDFTab: true,
 	openPDFWithDefaultApp: false,
 	openPDFWithDefaultAppAndObsidian: true,
@@ -384,18 +413,18 @@ export const DEFAULT_SETTINGS: PDFReaderSettings = {
 	persistentTextHighlightsInEmbed: true,
 	persistentAnnotationHighlightsInEmbed: false,
 	highlightBacklinks: true,
-	selectionBacklinkVisualizeStyle: 'highlight',
+	selectionBacklinkVisualizeStyle: "highlight",
 	dblclickEmbedToOpenLink: true,
 	highlightBacklinksPane: true,
 	highlightOnHoverBacklinkPane: true,
-	backlinkHoverColor: '',
+	backlinkHoverColor: "",
 	colors: {
-		'Yellow': '#ffd000',
-		'Red': '#ea5252',
-		'Note': '#086ddd',
-		'Important': '#bb61e5',
+		Yellow: "#ffd000",
+		Red: "#ea5252",
+		Note: "#086ddd",
+		Important: "#bb61e5",
 	},
-	defaultColor: '',
+	defaultColor: "",
 	defaultColorPaletteItemIndex: -1,
 	syncColorPaletteItem: true,
 	syncDefaultColorPaletteItem: false,
@@ -406,15 +435,15 @@ export const DEFAULT_SETTINGS: PDFReaderSettings = {
 	showStatusInToolbar: true,
 	highlightColorSpecifiedOnly: false,
 	doubleClickHighlightToOpenBacklink: true,
-	hoverHighlightAction: 'preview',
-	paneTypeForFirstMDLeaf: 'right',
+	hoverHighlightAction: "preview",
+	paneTypeForFirstMDLeaf: "right",
 	singleMDLeafInSidebar: true,
 	alwaysUseSidebar: true,
 	ignoreExistingMarkdownTabIn: [],
 	defaultColorPaletteActionIndex: 4,
 	syncColorPaletteAction: true,
 	syncDefaultColorPaletteAction: false,
-	proxyMDProperty: 'PDF',
+	proxyMDProperty: "PDF",
 	hoverPDFLinkToOpen: false,
 	ignoreHeightParamInPopoverPreview: true,
 	filterBacklinksByPageDefault: true,
@@ -424,7 +453,7 @@ export const DEFAULT_SETTINGS: PDFReaderSettings = {
 	alwaysRecordHistory: true,
 	renderMarkdownInStickyNote: false,
 	enablePDFEdit: false,
-	author: '',
+	author: "",
 	writeHighlightToFileOpacity: 0.2,
 	defaultWriteFileToggle: false,
 	syncWriteFileToggle: true,
@@ -434,28 +463,28 @@ export const DEFAULT_SETTINGS: PDFReaderSettings = {
 	warnBacklinkedAnnotationDelete: true,
 	enableAnnotationContentEdit: true,
 	enableEditEncryptedPDF: false,
-	pdfLinkColor: '#04a802',
+	pdfLinkColor: "#04a802",
 	pdfLinkBorder: false,
 	replaceContextMenu: false,
-	showContextMenuOnMouseUpIf: 'never',
+	showContextMenuOnMouseUpIf: "never",
 	contextMenuConfig: [
-		{ id: 'action', visible: true },
-		{ id: 'write-file', visible: true },
-		{ id: 'selection', visible: true },
-		{ id: 'annotation', visible: true },
-		{ id: 'modify-annotation', visible: true },
-		{ id: 'link', visible: true },
-		{ id: 'text', visible: true },
-		{ id: 'search', visible: true },
-		{ id: 'speech', visible: true },
-		{ id: 'page', visible: true },
-		{ id: 'settings', visible: true },
+		{ id: "action", visible: true },
+		{ id: "write-file", visible: true },
+		{ id: "selection", visible: true },
+		{ id: "annotation", visible: true },
+		{ id: "modify-annotation", visible: true },
+		{ id: "link", visible: true },
+		{ id: "text", visible: true },
+		{ id: "search", visible: true },
+		{ id: "speech", visible: true },
+		{ id: "page", visible: true },
+		{ id: "settings", visible: true },
 	],
-	selectionProductMenuConfig: ['color', 'copy-format', 'display'],
-	writeFileProductMenuConfig: ['color', 'copy-format', 'display'],
-	annotationProductMenuConfig: ['copy-format', 'display'],
+	selectionProductMenuConfig: ["color", "copy-format", "display"],
+	writeFileProductMenuConfig: ["color", "copy-format", "display"],
+	annotationProductMenuConfig: ["copy-format", "display"],
 	updateColorPaletteStateFromContextMenu: true,
-	mobileCopyAction: 'pdf-reader',
+	mobileCopyAction: "pdf-reader",
 	showContextMenuOnTablet: false,
 	executeBuiltinCommandForOutline: true,
 	executeBuiltinCommandForZoom: true,
@@ -465,21 +494,21 @@ export const DEFAULT_SETTINGS: PDFReaderSettings = {
 	defaultSidebarView: SidebarView.THUMBS,
 	outlineDrag: true,
 	outlineContextMenu: true,
-	outlineLinkDisplayTextFormat: '{{file.basename}}, {{text}}',
-	outlineLinkCopyFormat: '{{linkWithDisplay}}',
+	outlineLinkDisplayTextFormat: "{{file.basename}}, {{text}}",
+	outlineLinkCopyFormat: "{{linkWithDisplay}}",
 	recordHistoryOnOutlineClick: true,
 	popoverPreviewOnOutlineHover: true,
 	thumbnailDrag: true,
 	thumbnailContextMenu: true,
-	thumbnailLinkDisplayTextFormat: '{{file.basename}}, p.{{pageLabel}}',
-	thumbnailLinkCopyFormat: '{{linkWithDisplay}}',
+	thumbnailLinkDisplayTextFormat: "{{file.basename}}, p.{{pageLabel}}",
+	thumbnailLinkCopyFormat: "{{linkWithDisplay}}",
 	recordHistoryOnThumbnailClick: true,
 	popoverPreviewOnThumbnailHover: true,
 	annotationPopupDrag: true,
 	showAnnotationPopupOnHover: true,
 	useCallout: true,
-	calloutType: 'PDF',
-	calloutIcon: 'highlighter',
+	calloutType: "PDF",
+	calloutIcon: "highlighter",
 	// canvasContextMenu: true
 	highlightBacklinksInEmbed: false,
 	highlightBacklinksInHoverPopover: false,
@@ -494,40 +523,40 @@ export const DEFAULT_SETTINGS: PDFReaderSettings = {
 	autoCopy: false,
 	autoFocus: false,
 	autoPaste: false,
-	autoFocusTarget: 'last-active-and-open-then-last-paste',
-	autoPasteTarget: 'last-active-and-open-then-last-paste',
+	autoFocusTarget: "last-active-and-open-then-last-paste",
+	autoPasteTarget: "last-active-and-open-then-last-paste",
 	openAutoFocusTargetIfNotOpened: true,
-	howToOpenAutoFocusTargetIfNotOpened: 'right',
+	howToOpenAutoFocusTargetIfNotOpened: "right",
 	closeHoverEditorWhenLostFocus: true,
 	closeSidebarWhenLostFocus: false,
 	openAutoFocusTargetInEditingView: true,
 	executeCommandWhenTargetNotIdentified: true,
-	commandToExecuteWhenTargetNotIdentified: 'switcher:open',
+	commandToExecuteWhenTargetNotIdentified: "switcher:open",
 	autoPasteTargetDialogTimeoutSec: 20,
 	autoCopyToggleRibbonIcon: true,
-	autoCopyIconName: 'highlighter',
+	autoCopyIconName: "highlighter",
 	autoFocusToggleRibbonIcon: true,
-	autoFocusIconName: 'zap',
+	autoFocusIconName: "zap",
 	autoPasteToggleRibbonIcon: true,
-	autoPasteIconName: 'clipboard-paste',
+	autoPasteIconName: "clipboard-paste",
 	viewSyncFollowPageNumber: true,
 	viewSyncPageDebounceInterval: 0.3,
 	openAfterExtractPages: true,
-	howToOpenExtractedPDF: 'tab',
+	howToOpenExtractedPDF: "tab",
 	warnEveryPageDelete: false,
 	warnBacklinkedPageDelete: true,
-	copyOutlineAsListFormat: '{{linkWithDisplay}}',
-	copyOutlineAsListDisplayTextFormat: '{{text}}',
-	copyOutlineAsHeadingsFormat: '{{text}}\n\n{{linkWithDisplay}}',
-	copyOutlineAsHeadingsDisplayTextFormat: 'p.{{pageLabel}}',
+	copyOutlineAsListFormat: "{{linkWithDisplay}}",
+	copyOutlineAsListDisplayTextFormat: "{{text}}",
+	copyOutlineAsHeadingsFormat: "{{text}}\n\n{{linkWithDisplay}}",
+	copyOutlineAsHeadingsDisplayTextFormat: "p.{{pageLabel}}",
 	copyOutlineAsHeadingsMinLevel: 2,
-	newFileNameFormat: '',
-	newFileTemplatePath: '',
-	newPDFLocation: 'current',
-	newPDFFolderPath: '',
+	newFileNameFormat: "",
+	newFileTemplatePath: "",
+	newPDFLocation: "current",
+	newPDFFolderPath: "",
 	rectEmbedStaticImage: false,
-	rectImageFormat: 'file',
-	rectImageExtension: 'webp',
+	rectImageFormat: "file",
+	rectImageExtension: "webp",
 	zoomToFitRect: false,
 	rectFollowAdaptToTheme: true,
 	rectEmbedResolution: 100,
@@ -540,35 +569,32 @@ export const DEFAULT_SETTINGS: PDFReaderSettings = {
 	showBoundingRectForBacklinkedAnnot: false,
 	hideReplyAnnotation: false,
 	hideStampAnnotation: false,
-	searchLinkHighlightAll: 'true',
-	searchLinkCaseSensitive: 'true',
-	searchLinkMatchDiacritics: 'default',
-	searchLinkEntireWord: 'false',
+	searchLinkHighlightAll: "true",
+	searchLinkCaseSensitive: "true",
+	searchLinkMatchDiacritics: "default",
+	searchLinkEntireWord: "false",
 	dontFitWidthWhenOpenPDFLink: true,
 	preserveCurrentLeftOffsetWhenOpenPDFLink: false,
-	defaultZoomValue: 'page-width',
+	defaultZoomValue: "page-width",
 	scrollModeOnLoad: ScrollMode.VERTICAL,
 	spreadModeOnLoad: SpreadMode.NONE,
 	usePageUpAndPageDown: true,
 	hoverableDropdownMenuInToolbar: true,
 	zoomLevelInputBoxInToolbar: true,
 	popoverPreviewOnExternalLinkHover: true,
-	actionOnCitationHover: 'pdf-reader-bib-popover',
-	anystylePath: '',
+	actionOnCitationHover: "pdf-reader-bib-popover",
+	anystylePath: "",
 	enableBibInEmbed: false,
 	enableBibInHoverPopover: false,
 	enableBibInCanvas: true,
-	citationIdPatterns: '^cite.\n^bib\\d+$',
+	citationIdPatterns: "^cite.\n^bib\\d+$",
 	copyAsSingleLine: true,
 	removeWhitespaceBetweenCJChars: true,
-	dummyFileFolderPath: '',
-	externalURIPatterns: [
-		'.*\\.pdf$',
-		'https://arxiv.org/pdf/.*'
-	],
-	modifierToDropExternalPDFToCreateDummy: ['Shift'],
+	dummyFileFolderPath: "",
+	externalURIPatterns: [".*\\.pdf$", "https://arxiv.org/pdf/.*"],
+	modifierToDropExternalPDFToCreateDummy: ["Shift"],
 	vim: false,
-	vimrcPath: '',
+	vimrcPath: "",
 	vimVisualMotion: true,
 	vimScrollSize: 40,
 	vimLargerScrollSizeWhenZoomIn: true,
@@ -579,24 +605,22 @@ export const DEFAULT_SETTINGS: PDFReaderSettings = {
 	enableVimInContextMenu: true,
 	enableVimOutlineMode: true,
 	vimSmoothOutlineMode: true,
-	vimHintChars: 'hjklasdfgyuiopqwertnmzxcvb',
-	vimHintArgs: 'all',
-	PATH: '',
+	vimHintChars: "hjklasdfgyuiopqwertnmzxcvb",
+	vimHintArgs: "all",
+	PATH: "",
 	autoCheckForUpdates: true,
 	autoSync: false,
 	fixObsidianTextSelectionBug: true,
 	selectionToolbar: true,
 	showSelectionToolbarOnMouseUp: true,
+	warnBeforeCreateNote: true,
 };
-
 
 export function isPDFReaderSettingsKey(key: string): key is keyof PDFReaderSettings {
 	return DEFAULT_SETTINGS.hasOwnProperty(key);
 }
 
-
-const modKey = getModifierNameInPlatform('Mod').toLowerCase();
-
+const modKey = getModifierNameInPlatform("Mod").toLowerCase();
 
 export class PDFReaderSettingTab extends PluginSettingTab {
 	component: Component;
@@ -615,35 +639,41 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 		this.headings = new Map();
 		this.promises = [];
 
-		this.containerEl.addClass('pdf-reader-settings');
-		this.contentEl = this.containerEl.createDiv('content');
+		this.containerEl.addClass("pdf-reader-settings");
+		this.contentEl = this.containerEl.createDiv("content");
 	}
 
 	addSetting(settingName?: keyof PDFReaderSettings) {
 		const item = new Setting(this.contentEl);
 		if (settingName) {
 			this.items[settingName] = item;
-			this.component.registerDomEvent(item.settingEl, 'contextmenu', (evt) => {
+			this.component.registerDomEvent(item.settingEl, "contextmenu", (evt) => {
 				evt.preventDefault();
 				new Menu()
 					.addItem((item) => {
-						item.setTitle('Restore default value of this setting')
-							.setIcon('lucide-undo-2')
+						item.setTitle("Restore default value of this setting")
+							.setIcon("lucide-undo-2")
 							.onClick(async () => {
 								// @ts-ignore
-								this.plugin.settings[settingName] = this.plugin.getDefaultSettings()[settingName];
+								this.plugin.settings[settingName] =
+									this.plugin.getDefaultSettings()[settingName];
 								await this.plugin.saveSettings();
 
 								this.redisplay();
 
-								new Notice(`${this.plugin.manifest.name}: Default setting restored. Note that some options require a restart to take effect.`, 6000);
+								new Notice(
+									`${this.plugin.manifest.name}: Default setting restored. Note that some options require a restart to take effect.`,
+									6000,
+								);
 							});
 					})
 					.addItem((item) => {
-						item.setTitle('Copy link to this setting')
-							.setIcon('lucide-link')
+						item.setTitle("Copy link to this setting")
+							.setIcon("lucide-link")
 							.onClick(() => {
-								navigator.clipboard.writeText(`obsidian://pdf-reader?setting=${settingName}`);
+								navigator.clipboard.writeText(
+									`obsidian://pdf-reader?setting=${settingName}`,
+								);
 							});
 					})
 					.showAtMouseEvent(evt);
@@ -653,19 +683,19 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 	}
 
 	addHeading(heading: string, id: string) {
-		const setting = this.addSetting()
-			.setName(heading)
-			.setHeading();
+		const setting = this.addSetting().setName(heading).setHeading();
 
 		this.headings.set(id, setting);
-		this.component.registerDomEvent(setting.settingEl, 'contextmenu', (evt) => {
+		this.component.registerDomEvent(setting.settingEl, "contextmenu", (evt) => {
 			evt.preventDefault();
 			new Menu()
 				.addItem((item) => {
-					item.setTitle('Copy link to this heading')
-						.setIcon('lucide-link')
+					item.setTitle("Copy link to this heading")
+						.setIcon("lucide-link")
 						.onClick(() => {
-							navigator.clipboard.writeText(`obsidian://pdf-reader?setting=heading:${id}`);
+							navigator.clipboard.writeText(
+								`obsidian://pdf-reader?setting=heading:${id}`,
+							);
 						});
 				})
 				.showAtMouseEvent(evt);
@@ -673,8 +703,6 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 
 		return setting;
 	}
-
-
 
 	scrollTo(settingName: keyof PDFReaderSettings, options?: { behavior: ScrollBehavior }) {
 		const setting = this.items[settingName];
@@ -693,12 +721,10 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 
 	openFromObsidianUrl(params: ObsidianProtocolData) {
 		const id = params.setting;
-		if (id.startsWith('heading:')) {
-			this.plugin.openSettingTab()
-				.scrollToHeading(id.slice('heading:'.length));
+		if (id.startsWith("heading:")) {
+			this.plugin.openSettingTab().scrollToHeading(id.slice("heading:".length));
 		} else if (isPDFReaderSettingsKey(id)) {
-			this.plugin.openSettingTab()
-				.scrollTo(id);
+			this.plugin.openSettingTab().scrollTo(id);
 		}
 		return;
 	}
@@ -714,299 +740,330 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 	showConditionally(setting: Setting | Setting[], condition: () => boolean) {
 		const settings = Array.isArray(setting) ? setting : [setting];
 		const togglers = settings.map((setting) => this.getVisibilityToggler(setting, condition));
-		this.events.on('update', () => togglers.forEach((toggler) => toggler()));
+		this.events.on("update", () => togglers.forEach((toggler) => toggler()));
 		return settings;
 	}
 
-	addTextSetting(settingName: KeysOfType<PDFReaderSettings, string>, placeholder?: string, onBlurOrEnter?: (setting: Setting) => any) {
-		const setting = this.addSetting(settingName)
-			.addText((text) => {
-				text.setValue(this.plugin.settings[settingName])
-					.setPlaceholder(placeholder ?? '')
-					.then((text) => {
-						if (placeholder) {
-							text.inputEl.size = Math.max(text.inputEl.size, text.inputEl.placeholder.length);
-						}
-					})
-					.onChange(async (value) => {
-						// @ts-ignore
-						this.plugin.settings[settingName] = value;
-						await this.plugin.saveSettings();
-					});
-				if (onBlurOrEnter) {
-					this.component.registerDomEvent(text.inputEl, 'blur', () => {
-						onBlurOrEnter(setting);
-					});
-					this.component.registerDomEvent(text.inputEl, 'keypress', (evt) => {
-						if (evt.key === 'Enter') onBlurOrEnter(setting);
-					});
-				}
-			});
+	addTextSetting(
+		settingName: KeysOfType<PDFReaderSettings, string>,
+		placeholder?: string,
+		onBlurOrEnter?: (setting: Setting) => any,
+	) {
+		const setting = this.addSetting(settingName).addText((text) => {
+			text.setValue(this.plugin.settings[settingName])
+				.setPlaceholder(placeholder ?? "")
+				.then((text) => {
+					if (placeholder) {
+						text.inputEl.size = Math.max(
+							text.inputEl.size,
+							text.inputEl.placeholder.length,
+						);
+					}
+				})
+				.onChange(async (value) => {
+					// @ts-ignore
+					this.plugin.settings[settingName] = value;
+					await this.plugin.saveSettings();
+				});
+			if (onBlurOrEnter) {
+				this.component.registerDomEvent(text.inputEl, "blur", () => {
+					onBlurOrEnter(setting);
+				});
+				this.component.registerDomEvent(text.inputEl, "keypress", (evt) => {
+					if (evt.key === "Enter") onBlurOrEnter(setting);
+				});
+			}
+		});
 		return setting;
 	}
 
-	addTextAreaSetting(settingName: KeysOfType<PDFReaderSettings, string>, placeholder?: string, onBlur?: () => any) {
-		return this.addSetting(settingName)
-			.addTextArea((text) => {
-				text.setValue(this.plugin.settings[settingName])
-					.setPlaceholder(placeholder ?? '')
-					.onChange(async (value) => {
-						// @ts-ignore
-						this.plugin.settings[settingName] = value;
-						await this.plugin.saveSettings();
-					});
-				if (onBlur) this.component.registerDomEvent(text.inputEl, 'blur', onBlur);
-			});
+	addTextAreaSetting(
+		settingName: KeysOfType<PDFReaderSettings, string>,
+		placeholder?: string,
+		onBlur?: () => any,
+	) {
+		return this.addSetting(settingName).addTextArea((text) => {
+			text.setValue(this.plugin.settings[settingName])
+				.setPlaceholder(placeholder ?? "")
+				.onChange(async (value) => {
+					// @ts-ignore
+					this.plugin.settings[settingName] = value;
+					await this.plugin.saveSettings();
+				});
+			if (onBlur) this.component.registerDomEvent(text.inputEl, "blur", onBlur);
+		});
 	}
 
 	addNumberSetting(settingName: KeysOfType<PDFReaderSettings, number>) {
-		return this.addSetting(settingName)
-			.addText((text) => {
-				text.setValue('' + this.plugin.settings[settingName])
-					.setPlaceholder('' + DEFAULT_SETTINGS[settingName])
-					.then((text) => text.inputEl.type = 'number')
-					.onChange(async (value) => {
-						// @ts-ignore
-						this.plugin.settings[settingName] = value === '' ? DEFAULT_SETTINGS[settingName] : +value;
-						await this.plugin.saveSettings();
-					});
-			});
+		return this.addSetting(settingName).addText((text) => {
+			text.setValue("" + this.plugin.settings[settingName])
+				.setPlaceholder("" + DEFAULT_SETTINGS[settingName])
+				.then((text) => (text.inputEl.type = "number"))
+				.onChange(async (value) => {
+					// @ts-ignore
+					this.plugin.settings[settingName] =
+						value === "" ? DEFAULT_SETTINGS[settingName] : +value;
+					await this.plugin.saveSettings();
+				});
+		});
 	}
 
-	addToggleSetting(settingName: KeysOfType<PDFReaderSettings, boolean>, extraOnChange?: (value: boolean) => void) {
-		return this.addSetting(settingName)
-			.addToggle((toggle) => {
-				toggle.setValue(this.plugin.settings[settingName])
-					.onChange(async (value) => {
-						// @ts-ignore
-						this.plugin.settings[settingName] = value;
-						await this.plugin.saveSettings();
-						extraOnChange?.(value);
-					});
+	addToggleSetting(
+		settingName: KeysOfType<PDFReaderSettings, boolean>,
+		extraOnChange?: (value: boolean) => void,
+	) {
+		return this.addSetting(settingName).addToggle((toggle) => {
+			toggle.setValue(this.plugin.settings[settingName]).onChange(async (value) => {
+				// @ts-ignore
+				this.plugin.settings[settingName] = value;
+				await this.plugin.saveSettings();
+				extraOnChange?.(value);
 			});
+		});
 	}
 
-	addColorPickerSetting(settingName: KeysOfType<PDFReaderSettings, HexString>, extraOnChange?: (value: HexString) => void) {
-		return this.addSetting(settingName)
-			.addColorPicker((picker) => {
-				picker.setValue(this.plugin.settings[settingName])
-					.onChange(async (value) => {
-						// @ts-ignore
-						this.plugin.settings[settingName] = value;
-						await this.plugin.saveSettings();
-						extraOnChange?.(value);
-					});
+	addColorPickerSetting(
+		settingName: KeysOfType<PDFReaderSettings, HexString>,
+		extraOnChange?: (value: HexString) => void,
+	) {
+		return this.addSetting(settingName).addColorPicker((picker) => {
+			picker.setValue(this.plugin.settings[settingName]).onChange(async (value) => {
+				// @ts-ignore
+				this.plugin.settings[settingName] = value;
+				await this.plugin.saveSettings();
+				extraOnChange?.(value);
 			});
+		});
 	}
 
-	addDropdownSetting(settingName: KeysOfType<PDFReaderSettings, string>, options: readonly string[], display?: (option: string) => string, extraOnChange?: (value: string) => void): Setting;
-	addDropdownSetting(settingName: KeysOfType<PDFReaderSettings, string>, options: Record<string, string>, extraOnChange?: (value: string) => void): Setting;
+	addDropdownSetting(
+		settingName: KeysOfType<PDFReaderSettings, string>,
+		options: readonly string[],
+		display?: (option: string) => string,
+		extraOnChange?: (value: string) => void,
+	): Setting;
+	addDropdownSetting(
+		settingName: KeysOfType<PDFReaderSettings, string>,
+		options: Record<string, string>,
+		extraOnChange?: (value: string) => void,
+	): Setting;
 	addDropdownSetting(settingName: KeysOfType<PDFReaderSettings, string>, ...args: any[]) {
 		let options: string[] = [];
 		let display = (optionValue: string) => optionValue;
-		let extraOnChange = (value: string) => { };
+		let extraOnChange = (value: string) => {};
 		if (Array.isArray(args[0])) {
 			options = args[0];
-			if (typeof args[1] === 'function') display = args[1];
-			if (typeof args[2] === 'function') extraOnChange = args[2];
+			if (typeof args[1] === "function") display = args[1];
+			if (typeof args[2] === "function") extraOnChange = args[2];
 		} else {
 			options = Object.keys(args[0]);
 			display = (optionValue: string) => args[0][optionValue];
-			if (typeof args[1] === 'function') extraOnChange = args[1];
+			if (typeof args[1] === "function") extraOnChange = args[1];
 		}
-		return this.addSetting(settingName)
-			.addDropdown((dropdown) => {
-				for (const option of options) {
-					const displayName = display(option) ?? option;
-					dropdown.addOption(option, displayName);
-				}
-				dropdown.setValue(this.plugin.settings[settingName])
-					.onChange(async (value) => {
-						// @ts-ignore
-						this.plugin.settings[settingName] = value;
-						await this.plugin.saveSettings();
-						extraOnChange?.(value);
-					});
+		return this.addSetting(settingName).addDropdown((dropdown) => {
+			for (const option of options) {
+				const displayName = display(option) ?? option;
+				dropdown.addOption(option, displayName);
+			}
+			dropdown.setValue(this.plugin.settings[settingName]).onChange(async (value) => {
+				// @ts-ignore
+				this.plugin.settings[settingName] = value;
+				await this.plugin.saveSettings();
+				extraOnChange?.(value);
 			});
+		});
 	}
 
-	addIndexDropdownSetting(settingName: KeysOfType<PDFReaderSettings, number>, options: readonly string[], display?: (option: string) => string, extraOnChange?: (value: number) => void): Setting {
-		return this.addSetting(settingName)
-			.addDropdown((dropdown) => {
-				for (const option of options) {
-					const displayName = display?.(option) ?? option;
-					dropdown.addOption(option, displayName);
+	addIndexDropdownSetting(
+		settingName: KeysOfType<PDFReaderSettings, number>,
+		options: readonly string[],
+		display?: (option: string) => string,
+		extraOnChange?: (value: number) => void,
+	): Setting {
+		return this.addSetting(settingName).addDropdown((dropdown) => {
+			for (const option of options) {
+				const displayName = display?.(option) ?? option;
+				dropdown.addOption(option, displayName);
+			}
+			const index = this.plugin.settings[settingName];
+			const option = options[index];
+			dropdown.setValue(option).onChange(async (value) => {
+				const newIndex = options.indexOf(value);
+				if (newIndex !== -1) {
+					// @ts-ignore
+					this.plugin.settings[settingName] = newIndex;
+					await this.plugin.saveSettings();
+					extraOnChange?.(newIndex);
 				}
-				const index = this.plugin.settings[settingName];
-				const option = options[index];
-				dropdown.setValue(option)
-					.onChange(async (value) => {
-						const newIndex = options.indexOf(value);
-						if (newIndex !== -1) {
-							// @ts-ignore
-							this.plugin.settings[settingName] = newIndex;
-							await this.plugin.saveSettings();
-							extraOnChange?.(newIndex);
-						}
-					});
 			});
+		});
 	}
 
-	addEnumDropdownSetting(settingName: KeysOfType<PDFReaderSettings, number>, enumObj: Record<string, string>, extraOnChange?: (value: number) => void) {
-		return this.addSetting(settingName)
-			.addDropdown((dropdown) => {
-				for (const [key, value] of Object.entries(enumObj)) {
-					if (parseInt(key).toString() === key) {
-						dropdown.addOption(key, value);
-					}
+	addEnumDropdownSetting(
+		settingName: KeysOfType<PDFReaderSettings, number>,
+		enumObj: Record<string, string>,
+		extraOnChange?: (value: number) => void,
+	) {
+		return this.addSetting(settingName).addDropdown((dropdown) => {
+			for (const [key, value] of Object.entries(enumObj)) {
+				if (parseInt(key).toString() === key) {
+					dropdown.addOption(key, value);
 				}
-				dropdown.setValue('' + this.plugin.settings[settingName])
-					.onChange(async (value) => {
-						// @ts-ignore
-						this.plugin.settings[settingName] = +value;
-						await this.plugin.saveSettings();
-						extraOnChange?.(+value);
-					});
+			}
+			dropdown.setValue("" + this.plugin.settings[settingName]).onChange(async (value) => {
+				// @ts-ignore
+				this.plugin.settings[settingName] = +value;
+				await this.plugin.saveSettings();
+				extraOnChange?.(+value);
 			});
+		});
 	}
 
-	addSliderSetting(settingName: KeysOfType<PDFReaderSettings, number>, min: number, max: number, step: number) {
-		return this.addSetting(settingName)
-			.addSlider((slider) => {
-				slider.setLimits(min, max, step)
-					.setValue(this.plugin.settings[settingName])
-					.setDynamicTooltip()
-					.onChange(async (value) => {
-						// @ts-ignore
-						this.plugin.settings[settingName] = value;
-						await this.plugin.saveSettings();
-					});
-			});
+	addSliderSetting(
+		settingName: KeysOfType<PDFReaderSettings, number>,
+		min: number,
+		max: number,
+		step: number,
+	) {
+		return this.addSetting(settingName).addSlider((slider) => {
+			slider
+				.setLimits(min, max, step)
+				.setValue(this.plugin.settings[settingName])
+				.setDynamicTooltip()
+				.onChange(async (value) => {
+					// @ts-ignore
+					this.plugin.settings[settingName] = value;
+					await this.plugin.saveSettings();
+				});
+		});
 	}
 
 	addDesc(desc: string) {
-		return this.addSetting()
-			.setDesc(desc);
+		return this.addSetting().setDesc(desc);
 	}
 
 	addFileLocationSetting(
 		settingName: KeysOfType<PDFReaderSettings, NewFileLocation>,
 		postProcessDropdownSetting: (setting: Setting) => any,
 		folderPathSettingName: KeysOfType<PDFReaderSettings, string>,
-		postProcessFolderPathSetting: (setting: Setting) => any
+		postProcessFolderPathSetting: (setting: Setting) => any,
 	) {
 		return [
-			this.addDropdownSetting(settingName, NEW_FILE_LOCATIONS, () => this.redisplay())
-				.then(postProcessDropdownSetting),
+			this.addDropdownSetting(settingName, NEW_FILE_LOCATIONS, () => this.redisplay()).then(
+				postProcessDropdownSetting,
+			),
 			this.addSetting()
 				.addText((text) => {
 					text.setValue(this.plugin.settings[folderPathSettingName]);
 					text.inputEl.size = 30;
-					new FuzzyFolderSuggest(this.app, text.inputEl)
-						.onSelect(({ item: folder }) => {
-							// @ts-ignore
-							this.plugin.settings[folderPathSettingName] = folder.path;
-							this.plugin.saveSettings();
-						});
+					new FuzzyFolderSuggest(this.app, text.inputEl).onSelect(({ item: folder }) => {
+						// @ts-ignore
+						this.plugin.settings[folderPathSettingName] = folder.path;
+						this.plugin.saveSettings();
+					});
 				})
 				.then((setting) => {
 					postProcessFolderPathSetting(setting);
-					if (this.plugin.settings[settingName] !== 'folder') {
+					if (this.plugin.settings[settingName] !== "folder") {
 						setting.settingEl.hide();
 					}
-				})
+				}),
 		];
 	}
 
-	addAttachmentLocationSetting(settingName: KeysOfType<PDFReaderSettings, string>, defaultSubfolder: string, postProcessSettings: (locationSetting: Setting, folderPathSetting: Setting, subfolderPathSetting: Setting) => any) {
+	addAttachmentLocationSetting(
+		settingName: KeysOfType<PDFReaderSettings, string>,
+		defaultSubfolder: string,
+		postProcessSettings: (
+			locationSetting: Setting,
+			folderPathSetting: Setting,
+			subfolderPathSetting: Setting,
+		) => any,
+	) {
 		let locationDropdown: DropdownComponent;
 		let folderPathText: TextComponent;
 		let subfolderPathText: TextComponent;
 
 		const toggleVisibility = () => {
 			const value = locationDropdown.getValue();
-			folderPathSetting.settingEl.toggle(value === 'folder');
-			subfolderPathSetting.settingEl.toggle(value === 'subfolder');
+			folderPathSetting.settingEl.toggle(value === "folder");
+			subfolderPathSetting.settingEl.toggle(value === "subfolder");
 		};
 		const getNewAttachmentFolderPath = () => {
 			const value = locationDropdown.getValue() as NewAttachmentLocation;
-			if (value === 'root') {
-				return '/';
+			if (value === "root") {
+				return "/";
 			}
-			if (value === 'folder') {
+			if (value === "folder") {
 				return folderPathText.getValue() || defaultSubfolder;
 			}
-			if (value === 'current') {
-				return './';
+			if (value === "current") {
+				return "./";
 			}
-			if (value === 'subfolder') {
-				return './' + (subfolderPathText.getValue() || defaultSubfolder);
+			if (value === "subfolder") {
+				return "./" + (subfolderPathText.getValue() || defaultSubfolder);
 			}
-			return ''; // An empty string means matching the Obsidian default
+			return ""; // An empty string means matching the Obsidian default
 		};
 		const setValues = (value: string) => {
-			if (value === '') {
-				locationDropdown.setValue('obsidian');
+			if (value === "") {
+				locationDropdown.setValue("obsidian");
 				return;
 			}
-			if (value === '/') {
-				locationDropdown.setValue('root');
+			if (value === "/") {
+				locationDropdown.setValue("root");
 				return;
 			}
-			if (value !== '.' && value !== './') {
-				if (value.startsWith('./')) {
+			if (value !== "." && value !== "./") {
+				if (value.startsWith("./")) {
 					const subfolderName = value.slice(2);
-					locationDropdown.setValue('subfolder');
-					subfolderPathText.setValue(subfolderName !== defaultSubfolder ? subfolderName : '');
+					locationDropdown.setValue("subfolder");
+					subfolderPathText.setValue(
+						subfolderName !== defaultSubfolder ? subfolderName : "",
+					);
 					return;
 				}
-				locationDropdown.setValue('folder');
-				folderPathText.setValue(value !== defaultSubfolder ? value : '');
+				locationDropdown.setValue("folder");
+				folderPathText.setValue(value !== defaultSubfolder ? value : "");
 				return;
 			}
-			locationDropdown.setValue('current');
+			locationDropdown.setValue("current");
 			return;
 		};
 
-		const locationSetting = this.addSetting(settingName)
-			.addDropdown((dropdown) => {
-				dropdown.onChange(async () => {
-					toggleVisibility();
+		const locationSetting = this.addSetting(settingName).addDropdown((dropdown) => {
+			dropdown.onChange(async () => {
+				toggleVisibility();
+				// @ts-ignore
+				this.plugin.settings[settingName] = getNewAttachmentFolderPath();
+				await this.plugin.saveSettings();
+			});
+			dropdown.addOptions(NEW_ATTACHMENT_LOCATIONS);
+			locationDropdown = dropdown;
+		});
+		const folderPathSetting = this.addSetting().addText((text) => {
+			text.setPlaceholder(defaultSubfolder).onChange(async () => {
+				// @ts-ignore
+				this.plugin.settings[settingName] = getNewAttachmentFolderPath();
+				await this.plugin.saveSettings();
+			});
+			new FuzzyFolderSuggest(this.app, text.inputEl).onSelect(() => {
+				setTimeout(async () => {
 					// @ts-ignore
 					this.plugin.settings[settingName] = getNewAttachmentFolderPath();
 					await this.plugin.saveSettings();
 				});
-				dropdown.addOptions(NEW_ATTACHMENT_LOCATIONS);
-				locationDropdown = dropdown;
 			});
-		const folderPathSetting = this.addSetting()
-			.addText((text) => {
-				text.setPlaceholder(defaultSubfolder)
-					.onChange(async () => {
-						// @ts-ignore
-						this.plugin.settings[settingName] = getNewAttachmentFolderPath();
-						await this.plugin.saveSettings();
-					});
-				new FuzzyFolderSuggest(this.app, text.inputEl)
-					.onSelect(() => {
-						setTimeout(async () => {
-							// @ts-ignore
-							this.plugin.settings[settingName] = getNewAttachmentFolderPath();
-							await this.plugin.saveSettings();
-						});
-					});
-				folderPathText = text;
+			folderPathText = text;
+		});
+		const subfolderPathSetting = this.addSetting().addText((text) => {
+			text.setPlaceholder(defaultSubfolder).onChange(async () => {
+				// @ts-ignore
+				this.plugin.settings[settingName] = getNewAttachmentFolderPath();
+				await this.plugin.saveSettings();
 			});
-		const subfolderPathSetting = this.addSetting()
-			.addText((text) => {
-				text.setPlaceholder(defaultSubfolder)
-					.onChange(async () => {
-						// @ts-ignore
-						this.plugin.settings[settingName] = getNewAttachmentFolderPath();
-						await this.plugin.saveSettings();
-					});
-				subfolderPathText = text;
-			});
+			subfolderPathText = text;
+		});
 
 		postProcessSettings(locationSetting, folderPathSetting, subfolderPathSetting);
 
@@ -1014,14 +1071,19 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 		toggleVisibility();
 	}
 
-
 	async renderMarkdown(lines: string[] | string, el: HTMLElement) {
 		this.promises.push(this._renderMarkdown(lines, el));
-		el.addClass('markdown-rendered');
+		el.addClass("markdown-rendered");
 	}
 
 	async _renderMarkdown(lines: string[] | string, el: HTMLElement) {
-		await MarkdownRenderer.render(this.app, Array.isArray(lines) ? lines.join('\n') : lines, el, '', this.component);
+		await MarkdownRenderer.render(
+			this.app,
+			Array.isArray(lines) ? lines.join("\n") : lines,
+			el,
+			"",
+			this.component,
+		);
 		if (el.childNodes.length === 1 && el.firstChild instanceof HTMLParagraphElement) {
 			el.replaceChildren(...el.firstChild.childNodes);
 		}
@@ -1033,25 +1095,29 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 		let previousColor = color;
 		return this.addSetting()
 			.addText((text) => {
-				text.setPlaceholder('Color name (case-insensitive)')
+				text.setPlaceholder("Color name (case-insensitive)")
 					.then((text) => {
 						text.inputEl.size = text.inputEl.placeholder.length;
-						setTooltip(text.inputEl, 'Color name (case-insensitive)');
+						setTooltip(text.inputEl, "Color name (case-insensitive)");
 					})
 					.setValue(name)
 					.onChange(async (newName) => {
 						if (newName in colors) {
-							new Notice('This color name is already used.');
-							text.inputEl.addClass('error');
+							new Notice("This color name is already used.");
+							text.inputEl.addClass("error");
 							return;
 						}
-						text.inputEl.removeClass('error');
+						text.inputEl.removeClass("error");
 						delete colors[name];
 
-						for (const key of ['defaultColor', 'backlinkHoverColor'] as const) {
+						for (const key of ["defaultColor", "backlinkHoverColor"] as const) {
 							const setting = this.items[key];
 							if (setting) {
-								const optionEl = (setting.components[0] as DropdownComponent).selectEl.querySelector<HTMLOptionElement>(`:scope > option:nth-child(${index + 2})`);
+								const optionEl = (
+									setting.components[0] as DropdownComponent
+								).selectEl.querySelector<HTMLOptionElement>(
+									`:scope > option:nth-child(${index + 2})`,
+								);
 								if (optionEl) {
 									optionEl.value = newName;
 									optionEl.textContent = newName;
@@ -1079,8 +1145,9 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 				});
 			})
 			.addExtraButton((button) => {
-				button.setIcon('rotate-ccw')
-					.setTooltip('Return to previous color')
+				button
+					.setIcon("rotate-ccw")
+					.setTooltip("Return to previous color")
 					.onClick(async () => {
 						color = previousColor;
 						colors[name] = color;
@@ -1090,11 +1157,12 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 					});
 			})
 			.addExtraButton((button) => {
-				button.setIcon('trash')
-					.setTooltip('Delete')
+				button
+					.setIcon("trash")
+					.setTooltip("Delete")
 					.onClick(async () => {
 						if (this.plugin.settings.defaultColor === name) {
-							this.plugin.settings.defaultColor = '';
+							this.plugin.settings.defaultColor = "";
 						}
 						delete colors[name];
 						await this.plugin.saveSettings();
@@ -1104,26 +1172,32 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 			});
 	}
 
-	addNameValuePairListSetting<Item>(items: Item[], index: number, defaultIndexKey: KeysOfType<PDFReaderSettings, number>, accesors: {
-		getName: (item: Item) => string,
-		setName: (item: Item, value: string) => void,
-		getValue: (item: Item) => string,
-		setValue: (item: Item, value: string) => void,
-	}, configs: {
-		name: {
-			placeholder: string,
-			formSize: number,
-			duplicateMessage: string,
+	addNameValuePairListSetting<Item>(
+		items: Item[],
+		index: number,
+		defaultIndexKey: KeysOfType<PDFReaderSettings, number>,
+		accesors: {
+			getName: (item: Item) => string;
+			setName: (item: Item, value: string) => void;
+			getValue: (item: Item) => string;
+			setValue: (item: Item, value: string) => void;
 		},
-		value: {
-			placeholder: string,
-			formSize: number,
-			formRows?: number, // for multi-line value
+		configs: {
+			name: {
+				placeholder: string;
+				formSize: number;
+				duplicateMessage: string;
+			};
+			value: {
+				placeholder: string;
+				formSize: number;
+				formRows?: number; // for multi-line value
+			};
+			delete: {
+				deleteLastMessage: string;
+			};
 		},
-		delete: {
-			deleteLastMessage: string,
-		}
-	}) {
+	) {
 		const { getName, setName, getValue, setValue } = accesors;
 		const item = items[index];
 		const name = getName(item);
@@ -1140,15 +1214,19 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 					.onChange(async (newName) => {
 						if (items.some((item) => getName(item) === newName)) {
 							new Notice(configs.name.duplicateMessage);
-							text.inputEl.addClass('error');
+							text.inputEl.addClass("error");
 							return;
 						}
-						text.inputEl.removeClass('error');
+						text.inputEl.removeClass("error");
 						setName(item, newName);
 
 						const setting = this.items[defaultIndexKey];
 						if (setting) {
-							const optionEl = (setting.components[0] as DropdownComponent).selectEl.querySelector<HTMLOptionElement>(`:scope > option:nth-child(${index + 1})`);
+							const optionEl = (
+								setting.components[0] as DropdownComponent
+							).selectEl.querySelector<HTMLOptionElement>(
+								`:scope > option:nth-child(${index + 1})`,
+							);
 							if (optionEl) {
 								optionEl.value = newName;
 								optionEl.textContent = newName;
@@ -1159,9 +1237,10 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 					});
 			})
 			.then((setting) => {
-				if (configs.value.hasOwnProperty('formRows')) {
+				if (configs.value.hasOwnProperty("formRows")) {
 					setting.addTextArea((textarea) => {
-						textarea.setPlaceholder(configs.value.placeholder)
+						textarea
+							.setPlaceholder(configs.value.placeholder)
 							.then((textarea) => {
 								textarea.inputEl.rows = configs.value.formRows!;
 								textarea.inputEl.cols = configs.value.formSize;
@@ -1175,7 +1254,8 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 					});
 				} else {
 					setting.addText((textarea) => {
-						textarea.setPlaceholder(configs.value.placeholder)
+						textarea
+							.setPlaceholder(configs.value.placeholder)
 							.then((text) => {
 								text.inputEl.size = configs.value.formSize;
 								setTooltip(text.inputEl, configs.value.placeholder);
@@ -1189,8 +1269,9 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 				}
 			})
 			.addExtraButton((button) => {
-				button.setIcon('trash')
-					.setTooltip('Delete')
+				button
+					.setIcon("trash")
+					.setTooltip("Delete")
 					.onClick(async () => {
 						if (items.length === 1) {
 							new Notice(configs.delete.deleteLastMessage);
@@ -1207,79 +1288,92 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 						this.redisplay();
 					});
 			})
-			.setClass('no-border');
+			.setClass("no-border");
 	}
 
-	addNamedTemplatesSetting(items: NamedTemplate[], index: number, defaultIndexKey: KeysOfType<PDFReaderSettings, number>, configs: Parameters<PDFReaderSettingTab['addNameValuePairListSetting']>[4]) {
+	addNamedTemplatesSetting(
+		items: NamedTemplate[],
+		index: number,
+		defaultIndexKey: KeysOfType<PDFReaderSettings, number>,
+		configs: Parameters<PDFReaderSettingTab["addNameValuePairListSetting"]>[4],
+	) {
 		return this.addNameValuePairListSetting(
 			items,
 			index,
-			defaultIndexKey, {
-			getName: (item) => item.name,
-			setName: (item, value) => { item.name = value; },
-			getValue: (item) => item.template,
-			setValue: (item, value) => { item.template = value; },
-		}, configs);
+			defaultIndexKey,
+			{
+				getName: (item) => item.name,
+				setName: (item, value) => {
+					item.name = value;
+				},
+				getValue: (item) => item.template,
+				setValue: (item, value) => {
+					item.template = value;
+				},
+			},
+			configs,
+		);
 	}
 
 	addDisplayTextSetting(index: number) {
 		return this.addNamedTemplatesSetting(
 			this.plugin.settings.displayTextFormats,
 			index,
-			'defaultDisplayTextFormatIndex', {
-			name: {
-				placeholder: 'Format name',
-				formSize: 30,
-				duplicateMessage: 'This format name is already used.',
+			"defaultDisplayTextFormatIndex",
+			{
+				name: {
+					placeholder: "Format name",
+					formSize: 30,
+					duplicateMessage: "This format name is already used.",
+				},
+				value: {
+					placeholder: "Display text format",
+					formSize: 50,
+				},
+				delete: {
+					deleteLastMessage: "You cannot delete the last display text format.",
+				},
 			},
-			value: {
-				placeholder: 'Display text format',
-				formSize: 50,
-			},
-			delete: {
-				deleteLastMessage: 'You cannot delete the last display text format.',
-			}
-		});
+		);
 	}
 
 	addCopyCommandSetting(index: number) {
 		return this.addNamedTemplatesSetting(
 			this.plugin.settings.copyCommands,
 			index,
-			'defaultColorPaletteActionIndex', {
-			name: {
-				placeholder: 'Format name',
-				formSize: 30,
-				duplicateMessage: 'This format name is already used.',
+			"defaultColorPaletteActionIndex",
+			{
+				name: {
+					placeholder: "Format name",
+					formSize: 30,
+					duplicateMessage: "This format name is already used.",
+				},
+				value: {
+					placeholder: "Copied text format",
+					formSize: 50,
+					formRows: 3,
+				},
+				delete: {
+					deleteLastMessage: "You cannot delete the last copy format.",
+				},
 			},
-			value: {
-				placeholder: 'Copied text format',
-				formSize: 50,
-				formRows: 3,
-			},
-			delete: {
-				deleteLastMessage: 'You cannot delete the last copy format.',
-			}
-		});
+		);
 	}
 
 	addHotkeySettingButton(setting: Setting, query?: string) {
 		setting.addButton((button) => {
-			button.setButtonText('Open hotkeys settings')
-				.onClick(() => {
-					this.plugin.openHotkeySettingTab(query);
-				});
+			button.setButtonText("Open hotkeys settings").onClick(() => {
+				this.plugin.openHotkeySettingTab(query);
+			});
 		});
 	}
 
 	addPagePreviewSettingButton(setting: Setting) {
-		return setting
-			.addButton((button) => {
-				button.setButtonText('Open page preview settings')
-					.onClick(() => {
-						this.app.setting.openTabById('page-preview');
-					});
+		return setting.addButton((button) => {
+			button.setButtonText("Open page preview settings").onClick(() => {
+				this.app.setting.openTabById("page-preview");
 			});
+		});
 	}
 
 	addRequireModKeyOnHoverSetting(id: string) {
@@ -1287,61 +1381,78 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 		const required = this.plugin.requireModKeyForLinkHover(id);
 		return this.addSetting()
 			.setName(`Require ${modKey} key while hovering`)
-			.setDesc(`Currently ${required ? 'required' : 'not required'}. You can toggle this on and off in the core Page Preview plugin settings > ${display}.`)
+			.setDesc(
+				`Currently ${required ? "required" : "not required"}. You can toggle this on and off in the core Page Preview plugin settings > ${display}.`,
+			)
 			.then((setting) => this.addPagePreviewSettingButton(setting));
 	}
 
-	addIconSetting(settingName: KeysOfType<PDFReaderSettings, string>, leaveBlankToRemoveIcon: boolean) {
+	addIconSetting(
+		settingName: KeysOfType<PDFReaderSettings, string>,
+		leaveBlankToRemoveIcon: boolean,
+	) {
 		const normalizeIconNameNoPrefix = (name: string) => {
-			if (name.startsWith('lucide-')) {
+			if (name.startsWith("lucide-")) {
 				return name.slice(7);
 			}
 			return name;
 		};
 
 		const normalizeIconNameWithPrefix = (name: string) => {
-			if (!name.startsWith('lucide-')) {
-				return 'lucide-' + name;
+			if (!name.startsWith("lucide-")) {
+				return "lucide-" + name;
 			}
 			return name;
 		};
 
 		const renderAndValidateIcon = (setting: Setting) => {
-			const iconPreviewEl = setting.controlEl.querySelector<HTMLElement>(':scope>.icon-preview')
-				?? setting.controlEl.createDiv('icon-preview');
+			const iconPreviewEl =
+				setting.controlEl.querySelector<HTMLElement>(":scope>.icon-preview") ??
+				setting.controlEl.createDiv("icon-preview");
 			setIcon(iconPreviewEl, normalizeIconNameWithPrefix(this.plugin.settings[settingName]));
 
 			const text = setting.components[0] as TextComponent;
-			if ((!leaveBlankToRemoveIcon || this.plugin.settings[settingName]) && !iconPreviewEl.childElementCount) {
-				text.inputEl.addClass('error');
-				setTooltip(text.inputEl, 'No icon found');
+			if (
+				(!leaveBlankToRemoveIcon || this.plugin.settings[settingName]) &&
+				!iconPreviewEl.childElementCount
+			) {
+				text.inputEl.addClass("error");
+				setTooltip(text.inputEl, "No icon found");
 			} else {
-				text.inputEl.removeClass('error');
-				setTooltip(text.inputEl, '');
+				text.inputEl.removeClass("error");
+				setTooltip(text.inputEl, "");
 			}
 		};
 
 		return this.addTextSetting(settingName, undefined, (setting) => {
 			// @ts-ignore
-			this.plugin.settings[settingName] = normalizeIconNameNoPrefix(this.plugin.settings[settingName]);
+			this.plugin.settings[settingName] = normalizeIconNameNoPrefix(
+				this.plugin.settings[settingName],
+			);
 			this.plugin.saveSettings();
 			renderAndValidateIcon(setting);
 		})
 			.then((setting) => {
-				this.renderMarkdown([
-					'You can use any icon from [Lucide](https://lucide.dev/icons).'
-					+ (leaveBlankToRemoveIcon ? ' Leave blank to remove icons.' : ''),
-				], setting.descEl);
+				this.renderMarkdown(
+					[
+						"You can use any icon from [Lucide](https://lucide.dev/icons)." +
+							(leaveBlankToRemoveIcon ? " Leave blank to remove icons." : ""),
+					],
+					setting.descEl,
+				);
 			})
 			.then(renderAndValidateIcon);
 	}
 
-	addProductMenuSetting(key: KeysOfType<PDFReaderSettings, ('color' | 'copy-format' | 'display')[]>, heading: string) {
+	addProductMenuSetting(
+		key: KeysOfType<PDFReaderSettings, ("color" | "copy-format" | "display")[]>,
+		heading: string,
+	) {
 		const categories = DEFAULT_SETTINGS[key];
 		const displayNames: Record<string, string> = {
-			'color': 'Colors',
-			'copy-format': 'Copy format',
-			'display': 'Display text format',
+			color: "Colors",
+			"copy-format": "Copy format",
+			display: "Display text format",
 		};
 		const values = this.plugin.settings[key];
 
@@ -1349,8 +1460,8 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 
 		setting.addExtraButton((button) => {
 			button
-				.setTooltip('Reset')
-				.setIcon('rotate-ccw')
+				.setTooltip("Reset")
+				.setIcon("rotate-ccw")
 				.onClick(() => {
 					values.length = 0;
 					// @ts-ignore
@@ -1378,16 +1489,18 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 			this.addSetting()
 				.then((setting) => {
 					if (Platform.isDesktopApp) {
-						setting.setName(i === 0 ? 'Top-level menu' : i === 1 ? 'Submenu' : 'Subsubmenu');
+						setting.setName(
+							i === 0 ? "Top-level menu" : i === 1 ? "Submenu" : "Subsubmenu",
+						);
 					}
 				})
 				.addDropdown((dropdown) => {
 					for (const category of remainingCategories) {
 						dropdown.addOption(category, displayNames[category]);
 					}
-					if (i > 0) dropdown.addOption('', 'None');
+					if (i > 0) dropdown.addOption("", "None");
 
-					let currentValue: string = values[i] ?? '';
+					let currentValue: string = values[i] ?? "";
 					if (currentValue && !remainingCategories.includes(currentValue)) {
 						if (remainingCategories[0]) {
 							// @ts-ignore
@@ -1395,22 +1508,21 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 							currentValue = values[i];
 						}
 					}
-					dropdown.setValue(currentValue)
-						.onChange((value) => {
-							if (value) {
-								// @ts-ignore
-								values[i] = value;
-							} else {
-								while (values.length > i) values.pop();
-							}
+					dropdown.setValue(currentValue).onChange((value) => {
+						if (value) {
+							// @ts-ignore
+							values[i] = value;
+						} else {
+							while (values.length > i) values.pop();
+						}
 
-							this.plugin.saveSettings();
-							this.redisplay();
-						});
+						this.plugin.saveSettings();
+						this.redisplay();
+					});
 					dropdowns.push(dropdown);
 				})
 				.then((setting) => {
-					setting.settingEl.addClasses(['no-border', 'small-padding']);
+					setting.settingEl.addClasses(["no-border", "small-padding"]);
 				});
 		}
 
@@ -1418,31 +1530,31 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 	}
 
 	createLinkTo(id: keyof PDFReaderSettings, name?: string) {
-		return createEl('a', '', (el) => {
+		return createEl("a", "", (el) => {
 			el.onclick = (evt) => {
-				this.scrollTo(id, { behavior: 'smooth' });
+				this.scrollTo(id, { behavior: "smooth" });
 			};
 			activeWindow.setTimeout(() => {
 				const setting = this.items[id];
 				if (!name && setting) {
 					name = '"' + setting.nameEl.textContent + '"';
 				}
-				el.setText(name ?? '');
+				el.setText(name ?? "");
 			});
 		});
 	}
 
 	createLinkToHeading(id: string, name?: string) {
-		return createEl('a', '', (el) => {
+		return createEl("a", "", (el) => {
 			el.onclick = (evt) => {
-				this.scrollToHeading(id, { behavior: 'smooth' });
+				this.scrollToHeading(id, { behavior: "smooth" });
 			};
 			activeWindow.setTimeout(() => {
 				const setting = this.headings.get(id);
 				if (!name && setting) {
 					name = '"' + setting.nameEl.textContent + '"';
 				}
-				el.setText(name ?? '');
+				el.setText(name ?? "");
 			});
 		});
 	}
@@ -1453,7 +1565,7 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 		this.display();
 		this.contentEl.scroll({ top: scrollTop });
 
-		this.events.trigger('update');
+		this.events.trigger("update");
 	}
 
 	async display(): Promise<void> {
@@ -1461,153 +1573,199 @@ export class PDFReaderSettingTab extends PluginSettingTab {
 		this.promises = [];
 		this.component.load();
 
-		this.addHeading('Core PDF Settings', 'core-settings');
+		this.addHeading("Core PDF Settings", "core-settings");
 
-		this.addTextSetting('proxyMDProperty')
-			.setName('Associated Note Property')
-			.setDesc('The property in your markdown note that links to the PDF (e.g., "source" or "PDF").');
+		this.addTextSetting("proxyMDProperty")
+			.setName("Associated Note Property")
+			.setDesc(
+				'The property in your markdown note that links to the PDF (e.g., "source" or "PDF").',
+			);
 
-
-		this.addTextSetting('newPDFFolderPath')
-			.setName('Auto-create Target Folder')
+		this.addTextSetting("newPDFFolderPath")
+			.setName("Auto-create target folder")
 			.setDesc('Folder where new associated notes will be created (e.g., "References").')
 			.then((setting) => {
 				const inputEl = (setting.components[0] as TextComponent).inputEl;
-				new FuzzyFolderSuggest(this.app, inputEl)
-					.onSelect(({ item: folder }) => {
-						this.plugin.settings.newPDFFolderPath = folder.path;
-						this.plugin.saveSettings();
-						this.redisplay();
-					});
+				new FuzzyFolderSuggest(this.app, inputEl).onSelect(({ item: folder }) => {
+					this.plugin.settings.newPDFFolderPath = folder.path;
+					this.plugin.saveSettings();
+					this.redisplay();
+				});
 			});
 
-		this.addTextSetting('newFileTemplatePath')
-			.setName('Auto-create Template')
-			.setDesc('Markdown file to use as a template for new associated notes.')
+		this.addToggleSetting("warnBeforeCreateNote")
+			.setName("Confirm before auto-creating associated note")
+			.setDesc(
+				"Whether to ask for confirmation before automatically creating a new markdown note for a PDF.",
+			);
+
+		this.addTextSetting("newFileTemplatePath")
+			.setName("Auto-create Template")
+			.setDesc("Markdown file to use as a template for new associated notes.")
 			.then((setting) => {
 				const inputEl = (setting.components[0] as TextComponent).inputEl;
-				new FuzzyMarkdownFileSuggest(this.app, inputEl)
-					.onSelect(({ item: file }) => {
-						this.plugin.settings.newFileTemplatePath = file.path;
-						this.plugin.saveSettings();
-						this.redisplay();
-					});
+				new FuzzyMarkdownFileSuggest(this.app, inputEl).onSelect(({ item: file }) => {
+					this.plugin.settings.newFileTemplatePath = file.path;
+					this.plugin.saveSettings();
+					this.redisplay();
+				});
 			});
 
-		this.addToggleSetting('autoSync')
-			.setName('Auto-sync Annotations')
-			.setDesc('Automatically sync annotations from PDF to the associated note when the PDF is modified.');
+		this.addToggleSetting("autoSync")
+			.setName("Auto-sync Annotations")
+			.setDesc(
+				"Automatically sync annotations from PDF to the associated note when the PDF is modified.",
+			);
 
-		this.addHeading('Annotation & Writing', 'annotation-writing');
+		this.addHeading("Annotation & Writing", "annotation-writing");
 
-		this.addToggleSetting('enablePDFEdit')
-			.setName('Enable PDF Annotation Writing')
-			.setDesc('Allow the plugin to write highlights directly into the PDF file. This requires an "Annotation Author" name below.');
+		this.addToggleSetting("enablePDFEdit")
+			.setName("Enable PDF Annotation Writing")
+			.setDesc(
+				'Allow the plugin to write highlights directly into the PDF file. This requires an "Annotation Author" name below.',
+			);
 
-		this.addTextSetting('author')
-			.setName('Annotation Author')
-			.setDesc('The name that will be recorded as the author of the annotations written into the PDF.');
+		this.addTextSetting("author")
+			.setName("Annotation Author")
+			.setDesc(
+				"The name that will be recorded as the author of the annotations written into the PDF.",
+			);
 
-		this.addSliderSetting('writeHighlightToFileOpacity', 0.1, 1, 0.05)
-			.setName('PDF Highlight Opacity')
-			.setDesc('The transparency of highlights written into the PDF file (0.1: transparent, 1: opaque).');
+		this.addSliderSetting("writeHighlightToFileOpacity", 0.1, 1, 0.05)
+			.setName("PDF Highlight Opacity")
+			.setDesc(
+				"The transparency of highlights written into the PDF file (0.1: transparent, 1: opaque).",
+			);
 
-		this.addHeading('Interface & Toolbars', 'ui-settings');
+		this.addHeading("Interface & Toolbars", "ui-settings");
 
-		this.addToggleSetting('colorPaletteInToolbar')
-			.setName('Show color palette in reader toolbar')
-			.setDesc('Show color selection icons in the top toolbar of the PDF reader view.');
+		this.addToggleSetting("colorPaletteInToolbar")
+			.setName("Show color palette in reader toolbar")
+			.setDesc("Show color selection icons in the top toolbar of the PDF reader view.");
 
-		this.addToggleSetting('colorPaletteInEmbedToolbar')
-			.setName('Show color palette in PDF embeds')
-			.setDesc('Show color selection icons in the toolbar of embedded PDF files.');
+		this.addToggleSetting("colorPaletteInEmbedToolbar")
+			.setName("Show color palette in PDF embeds")
+			.setDesc("Show color selection icons in the toolbar of embedded PDF files.");
 
-		this.addToggleSetting('noColorButtonInColorPalette')
+		this.addToggleSetting("noColorButtonInColorPalette")
 			.setName('Show "No color" button')
-			.setDesc('Show a transparent button in the color palette to copy links without specifying a color.');
+			.setDesc(
+				"Show a transparent button in the color palette to copy links without specifying a color.",
+			);
 
-		this.addHeading('Color Customization', 'color-customization');
+		this.addHeading("Color Customization", "color-customization");
 
 		const colorNames = Object.keys(this.plugin.settings.colors);
-		this.addDropdownSetting('defaultColor', ['', ...colorNames], (name) => name || 'None')
-			.setName('Default Highlight Color')
-			.setDesc('The default color to use when none is selected.');
+		this.addDropdownSetting("defaultColor", ["", ...colorNames], (name) => name || "None")
+			.setName("Default Highlight Color")
+			.setDesc("The default color to use when none is selected.");
 
 		this.addSetting()
-			.setName('Manage Colors')
-			.setDesc('Add or remove colors available in the palette.')
-			.addButton((btn) => btn.setButtonText('Add Color').onClick(async () => {
-				let i = 1;
-				while (`New Color ${i}` in this.plugin.settings.colors) i++;
-				this.plugin.settings.colors[`New Color ${i}`] = '#ffd000';
-				await this.plugin.saveSettings();
-				this.redisplay();
-			}));
+			.setName("Manage Colors")
+			.setDesc("Add or remove colors available in the palette.")
+			.addButton((btn) =>
+				btn.setButtonText("Add Color").onClick(async () => {
+					let i = 1;
+					while (`New Color ${i}` in this.plugin.settings.colors) i++;
+					this.plugin.settings.colors[`New Color ${i}`] = "#ffd000";
+					await this.plugin.saveSettings();
+					this.redisplay();
+				}),
+			);
 
 		for (let i = 0; i < Object.keys(this.plugin.settings.colors).length; i++) {
 			this.addColorSetting(i);
 		}
 
-		this.addHeading('Copy Templates', 'copy-templates');
+		this.addHeading("Copy Templates", "copy-templates");
 
 		this.addSetting()
-			.setName('Link Copy Formats')
-			.setDesc('Customize the templates for copying links to selections or annotations.')
-			.addButton((btn) => btn.setButtonText('Add Format').onClick(async () => {
-				this.plugin.settings.copyCommands.push({ name: 'New Format', template: '{{link}}' });
-				await this.plugin.saveSettings();
-				this.redisplay();
-			}));
+			.setName("Link Copy Formats")
+			.setDesc("Customize the templates for copying links to selections or annotations.")
+			.addButton((btn) =>
+				btn.setButtonText("Add Format").onClick(async () => {
+					this.plugin.settings.copyCommands.push({
+						name: "New Format",
+						template: "{{link}}",
+					});
+					await this.plugin.saveSettings();
+					this.redisplay();
+				}),
+			);
 
 		for (let i = 0; i < this.plugin.settings.copyCommands.length; i++) {
 			this.addCopyCommandSetting(i);
 		}
 
-		this.addHeading('Display Text Templates', 'display-text-templates');
+		this.addHeading("Display Text Templates", "display-text-templates");
 
 		this.addSetting()
-			.setName('Display Text Formats')
-			.setDesc('Customize how the link text looks (e.g., page number, file name).')
-			.addButton((btn) => btn.setButtonText('Add Format').onClick(async () => {
-				this.plugin.settings.displayTextFormats.push({ name: 'New Format', template: '{{text}}' });
-				await this.plugin.saveSettings();
-				this.redisplay();
-			}));
+			.setName("Display Text Formats")
+			.setDesc("Customize how the link text looks (e.g., page number, file name).")
+			.addButton((btn) =>
+				btn.setButtonText("Add Format").onClick(async () => {
+					this.plugin.settings.displayTextFormats.push({
+						name: "New Format",
+						template: "{{text}}",
+					});
+					await this.plugin.saveSettings();
+					this.redisplay();
+				}),
+			);
 
 		for (let i = 0; i < this.plugin.settings.displayTextFormats.length; i++) {
 			this.addDisplayTextSetting(i);
 		}
 
 		this.addSetting()
-			.setName('Restore All Settings')
-			.setDesc('Restore all plugin settings to their default values.')
-			.addButton((btn) => btn.setButtonText('Restore Default').setWarning().onClick(async () => {
-				if (confirm('Are you sure you want to restore all settings to default?')) {
-					await this.plugin.restoreDefaultSettings();
-					this.redisplay();
-				}
-			}));
+			.setName("Restore All Settings")
+			.setDesc("Restore all plugin settings to their default values.")
+			.addButton((btn) =>
+				btn
+					.setButtonText("Restore Default")
+					.setWarning()
+					.onClick(async () => {
+						if (confirm("Are you sure you want to restore all settings to default?")) {
+							await this.plugin.restoreDefaultSettings();
+							this.redisplay();
+						}
+					}),
+			);
 
 		await Promise.all(this.promises);
 	}
 	async hide() {
 		this.plugin.settings.colors = Object.fromEntries(
-			Object.entries(this.plugin.settings.colors).filter(([name, color]) => name && isHexString(color))
+			Object.entries(this.plugin.settings.colors).filter(
+				([name, color]) => name && isHexString(color),
+			),
 		);
-		if (this.plugin.settings.defaultColor && !(this.plugin.settings.defaultColor in this.plugin.settings.colors)) {
-			this.plugin.settings.defaultColor = '';
+		if (
+			this.plugin.settings.defaultColor &&
+			!(this.plugin.settings.defaultColor in this.plugin.settings.colors)
+		) {
+			this.plugin.settings.defaultColor = "";
 		}
-		if (this.plugin.settings.backlinkHoverColor && !(this.plugin.settings.backlinkHoverColor in this.plugin.settings.colors)) {
-			this.plugin.settings.backlinkHoverColor = '';
+		if (
+			this.plugin.settings.backlinkHoverColor &&
+			!(this.plugin.settings.backlinkHoverColor in this.plugin.settings.colors)
+		) {
+			this.plugin.settings.backlinkHoverColor = "";
 		}
 
-		this.plugin.settings.copyCommands = this.plugin.settings.copyCommands.filter((command) => command.name && command.template);
-		this.plugin.settings.displayTextFormats = this.plugin.settings.displayTextFormats.filter((format) => format.name); // allow empty display text formats
+		this.plugin.settings.copyCommands = this.plugin.settings.copyCommands.filter(
+			(command) => command.name && command.template,
+		);
+		this.plugin.settings.displayTextFormats = this.plugin.settings.displayTextFormats.filter(
+			(format) => format.name,
+		); // allow empty display text formats
 
 		// avoid annotations to be not referneceable
 		if (this.plugin.settings.enablePDFEdit && !this.plugin.settings.author) {
 			this.plugin.settings.enablePDFEdit = false;
-			new Notice(`${this.plugin.manifest.name}: Cannot enable writing highlights into PDF files because the "Annotation author" option is empty.`);
+			new Notice(
+				`${this.plugin.manifest.name}: Cannot enable writing highlights into PDF files because the "Annotation author" option is empty.`,
+			);
 		}
 
 		this.plugin.validateAutoFocusAndAutoPasteSettings();

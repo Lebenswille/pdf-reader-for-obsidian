@@ -1,22 +1,21 @@
-import PDFReader from 'main';
-import { HighlightGeometryLib } from './geometry';
-import { ViewerHighlightLib } from './viewer';
-import { PDFReaderLibSubmodule } from '../submodule';
-// import { AnnotationWriteFileLib } from './write-file';
-import { HighlightExtractor } from './extract';
-
+import PDFReader from "main";
+import { HighlightGeometryLib } from "./geometry";
+import { ViewerHighlightLib } from "./viewer";
+import { PDFReaderLibSubmodule } from "../submodule";
+import { AnnotationWriteFileLib } from "./write-file";
+import { HighlightExtractor } from "./extract";
 
 export class HighlightLib extends PDFReaderLibSubmodule {
-    geometry: HighlightGeometryLib;
-    viewer: ViewerHighlightLib;
-    // writeFile: AnnotationWriteFileLib;
-    extract: HighlightExtractor;
+	geometry: HighlightGeometryLib;
+	viewer: ViewerHighlightLib;
+	writeFile: AnnotationWriteFileLib;
+	extract: HighlightExtractor;
 
-    constructor(public plugin: PDFReader) {
-        super(plugin);
-        this.geometry = new HighlightGeometryLib(plugin);
-        this.viewer = new ViewerHighlightLib(plugin);
-        // this.writeFile = new AnnotationWriteFileLib(plugin);
-        this.extract = new HighlightExtractor(plugin);
-    }
+	constructor(public plugin: PDFReader) {
+		super(plugin);
+		this.geometry = new HighlightGeometryLib(plugin);
+		this.viewer = new ViewerHighlightLib(plugin);
+		this.writeFile = new AnnotationWriteFileLib(plugin);
+		this.extract = new HighlightExtractor(plugin);
+	}
 }

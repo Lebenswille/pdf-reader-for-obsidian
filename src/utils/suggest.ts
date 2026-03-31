@@ -1,29 +1,37 @@
+import {
+	AbstractInputSuggest,
+	App,
+	Command,
+	FuzzyMatch,
+	SearchResultContainer,
+	TFile,
+	TFolder,
+	prepareFuzzySearch,
+	renderResults,
+	sortSearchResults,
+} from "obsidian";
 
-import { AbstractInputSuggest, App, Command, FuzzyMatch, SearchResultContainer, TFile, TFolder, prepareFuzzySearch, renderResults, sortSearchResults } from 'obsidian';
-
-import PDFReader from 'main';
-import { PDFReaderSettingTab } from 'settings';
-
+import PDFReader from "main";
+import { PDFReaderSettingTab } from "settings";
 
 type FuzzyInputSuggestOptions = {
-    blurOnSelect: boolean;
-    closeOnSelect: boolean;
-}
-
-const DEFAULT_FUZZY_INPUT_SUGGEST_OPTIONS: FuzzyInputSuggestOptions = {
-    blurOnSelect: true,
-    closeOnSelect: true,
+	blurOnSelect: boolean;
+	closeOnSelect: boolean;
 };
 
+const DEFAULT_FUZZY_INPUT_SUGGEST_OPTIONS: FuzzyInputSuggestOptions = {
+	blurOnSelect: true,
+	closeOnSelect: true,
+};
 
 export abstract class FuzzyInputSuggest<T> extends AbstractInputSuggest<FuzzyMatch<T>> {
 	inputEl: HTMLInputElement;
-    options: FuzzyInputSuggestOptions;
+	options: FuzzyInputSuggestOptions;
 
 	constructor(app: App, inputEl: HTMLInputElement, options?: Partial<FuzzyInputSuggestOptions>) {
 		super(app, inputEl);
 		this.inputEl = inputEl;
-        this.options = Object.assign(DEFAULT_FUZZY_INPUT_SUGGEST_OPTIONS, options);
+		this.options = Object.assign(DEFAULT_FUZZY_INPUT_SUGGEST_OPTIONS, options);
 	}
 
 	abstract getItems(): T[];
@@ -53,11 +61,10 @@ export abstract class FuzzyInputSuggest<T> extends AbstractInputSuggest<FuzzyMat
 		// @ts-ignore
 		super.selectSuggestion(result, evt); // this ts-ignore is needed due to a bug in Obsidian's type definition
 		this.inputEl.value = this.getItemText(result.item);
-        if (this.options.blurOnSelect) this.inputEl.blur();
+		if (this.options.blurOnSelect) this.inputEl.blur();
 		if (this.options.closeOnSelect) this.close();
 	}
 }
-
 
 export class FuzzyMarkdownFileSuggest extends FuzzyInputSuggest<TFile> {
 	getItems() {
@@ -69,7 +76,6 @@ export class FuzzyMarkdownFileSuggest extends FuzzyInputSuggest<TFile> {
 	}
 }
 
-
 export class FuzzyFileSuggest extends FuzzyInputSuggest<TFile> {
 	getItems() {
 		return this.app.vault.getFiles();
@@ -80,17 +86,17 @@ export class FuzzyFileSuggest extends FuzzyInputSuggest<TFile> {
 	}
 }
 
-
 export class FuzzyFolderSuggest extends FuzzyInputSuggest<TFolder> {
 	getItems() {
-		return this.app.vault.getAllLoadedFiles().filter((file): file is TFolder => file instanceof TFolder);
+		return this.app.vault
+			.getAllLoadedFiles()
+			.filter((file): file is TFolder => file instanceof TFolder);
 	}
 
 	getItemText(file: TFolder) {
 		return file.path;
 	}
 }
-
 
 export class CommandSuggest extends AbstractInputSuggest<Command> {
 	plugin: PDFReader;

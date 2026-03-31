@@ -1,20 +1,57 @@
-import { Constructor, EventRef, Events, FileSystemAdapter, Keymap, Menu, Notice, ObsidianProtocolData, PaneType, Platform, Plugin, SettingTab, TFile, addIcon, apiVersion, loadPdfJs, requireApiVersion } from 'obsidian';
-import * as pdflib from '@cantoo/pdf-lib';
+import {
+	Constructor,
+	EventRef,
+	Events,
+	FileSystemAdapter,
+	Keymap,
+	Menu,
+	Notice,
+	ObsidianProtocolData,
+	PaneType,
+	Platform,
+	Plugin,
+	SettingTab,
+	TFile,
+	addIcon,
+	apiVersion,
+	loadPdfJs,
+	requireApiVersion,
+} from "obsidian";
+import * as pdflib from "@cantoo/pdf-lib";
 
-import { patchPDFView, patchPDFInternals, patchBacklink, patchWorkspace, patchPagePreview, patchClipboardManager, patchPDFInternalFromPDFEmbed, patchMenu } from 'patchers';
-import { PDFReaderLib } from 'lib';
-import { AutoCopyMode } from 'auto-copy';
-import { ColorPalette } from 'color-palette';
-import { DomManager } from 'dom-manager';
-import { PDFCroppedEmbed } from 'pdf-cropped-embed';
-import { DEFAULT_SETTINGS, NamedTemplate, PDFReaderSettings, PDFReaderSettingTab } from 'settings';
-import { subpathToParams, OverloadParameters, focusObsidian, isTargetHTMLElement, KeysOfType } from 'utils';
-import { DestArray, PDFEmbed, PDFView, PDFViewerChild, PDFViewerComponent, Rect } from 'typings';
-import { InstallerVersionModal } from 'modals';
-import { PDFExternalLinkPostProcessor, PDFInternalLinkPostProcessor, PDFOutlineItemPostProcessor, PDFThumbnailItemPostProcessor } from 'post-process';
-import { BibliographyManager } from 'bib';
-import { DataviewInlineFieldsModal, withFilesWithInlineFields } from 'lib/dataview';
-
+import {
+	patchPDFView,
+	patchPDFInternals,
+	patchBacklink,
+	patchWorkspace,
+	patchPagePreview,
+	patchClipboardManager,
+	patchPDFInternalFromPDFEmbed,
+	patchMenu,
+} from "patchers";
+import { PDFReaderLib } from "lib";
+import { AutoCopyMode } from "auto-copy";
+import { ColorPalette } from "color-palette";
+import { DomManager } from "dom-manager";
+import { PDFCroppedEmbed } from "pdf-cropped-embed";
+import { DEFAULT_SETTINGS, NamedTemplate, PDFReaderSettings, PDFReaderSettingTab } from "settings";
+import {
+	subpathToParams,
+	OverloadParameters,
+	focusObsidian,
+	isTargetHTMLElement,
+	KeysOfType,
+} from "utils";
+import { DestArray, PDFEmbed, PDFView, PDFViewerChild, PDFViewerComponent, Rect } from "typings";
+import { InstallerVersionModal } from "modals";
+import {
+	PDFExternalLinkPostProcessor,
+	PDFInternalLinkPostProcessor,
+	PDFOutlineItemPostProcessor,
+	PDFThumbnailItemPostProcessor,
+} from "post-process";
+import { BibliographyManager } from "bib";
+import { DataviewInlineFieldsModal, withFilesWithInlineFields } from "lib/dataview";
 
 export default class PDFReader extends Plugin {
 	/** The core internal API. Not intended to be used by other plugins. */
@@ -39,16 +76,16 @@ export default class PDFReader extends Plugin {
 		pdfView: false,
 		pdfInternals: false,
 		pdfOutlineViewer: false,
-		backlink: false
+		backlink: false,
 	};
-	/** 
+	/**
 	 * When no PDF view or PDF embed is opened at the moment the plugin is loaded, the PDF internals will
 	 * patched when the user opens a PDF link for the first time.
 	 * After patching, the `onPDFInternalsPatchSuccess` function (defined in src/patchers/pdf-internals.ts) will be called,
 	 * in which `PDFViewerComponent.loadFile(file, subpath)` will be re-executed in order to refresh the PDF view and reflect the patch.
 	 * However, `PDFViewerComponent` does not have the information of the subpath to be opened at the moment, so we need to store it here
 	 * so that we can pass it to `loadFile` when the patch is successful.
-	 * 
+	 *
 	 * Without this, when the user opens a link to PDF selection or annotation, it will not be highlighted (Obsidian-native highlight, not PDF Reader highlight)
 	 * properly if it is the first time the user opens a PDF link.
 	 */
@@ -59,8 +96,8 @@ export default class PDFReader extends Plugin {
 		PDFViewerChild?: Constructor<PDFViewerChild>;
 		PDFEmbed?: Constructor<PDFEmbed>;
 	} = {};
-	/** 
-	 * Tracks the markdown file that a link to a PDF text selection or an annotation was pasted into for the last time. 
+	/**
+	 * Tracks the markdown file that a link to a PDF text selection or an annotation was pasted into for the last time.
 	 * Used for auto-pasting.
 	 */
 	lastPasteFile: TFile | null = null;
@@ -68,7 +105,10 @@ export default class PDFReader extends Plugin {
 	/** Tracks the PDFViewerChild instance that an annotation popup was rendered on for the last time. */
 	lastAnnotationPopupChild: PDFViewerChild | null = null;
 	/** Stores the file and the explicit destination array corresponding to the last link copied with the "Copy link to current page view" command */
-	lastCopiedDestInfo: { file: TFile, destArray: DestArray } | { file: TFile, destName: string } | null = null;
+	lastCopiedDestInfo:
+		| { file: TFile; destArray: DestArray }
+		| { file: TFile; destName: string }
+		| null = null;
 	vimrc: string | null = null;
 	citationIdRegex: RegExp;
 	/** Maps a `div.pdf-container` element to the corresponding `PDFViewerChild` object. */
@@ -103,7 +143,7 @@ export default class PDFReader extends Plugin {
 		this.domManager = this.addChild(new DomManager(this));
 		this.domManager.registerCalloutRenderer();
 
-// this.registerRibbonIcons();
+		// this.registerRibbonIcons();
 
 		this.patchObsidian();
 
@@ -119,9 +159,9 @@ export default class PDFReader extends Plugin {
 
 		this.startTrackingActiveMarkdownFile();
 
-		this.registerObsidianProtocolHandler('pdf-reader', this.obsidianProtocolHandler.bind(this));
+		this.registerObsidianProtocolHandler("pdf-reader", this.obsidianProtocolHandler.bind(this));
 
-		this.addSettingTab(this.settingTab = new PDFReaderSettingTab(this));
+		this.addSettingTab((this.settingTab = new PDFReaderSettingTab(this)));
 
 		this.registerStyleSettings();
 
@@ -151,7 +191,7 @@ export default class PDFReader extends Plugin {
 				try {
 					await adapter.rmdir(anyStyleInputDir, true);
 				} catch (err) {
-					if (err.code !== 'ENOENT') throw err;
+					if (err.code !== "ENOENT") throw err;
 				}
 			}
 		}
@@ -161,23 +201,26 @@ export default class PDFReader extends Plugin {
 		// See:
 		// https://forum.obsidian.md/t/in-1-8-0-pdf-copy-link-to-selection-fails-to-copy-proper-links-in-some-cases/93545
 		// https://github.com/RyotaUshio/obsidian-pdf-reader/issues/327
-		this.textDivFirstIdx = apiVersion === '1.8.0' ? 1 : 0;
+		this.textDivFirstIdx = apiVersion === "1.8.0" ? 1 : 0;
 
 		// See:
 		// https://forum.obsidian.md/t/pdf-view-loses-focus-after-closing-command-palette-causing-some-commands-to-fail-to-run/97973
-		this.obsidianHasFocusBug = !requireApiVersion('1.9.0');
+		this.obsidianHasFocusBug = !requireApiVersion("1.9.0");
 
 		// See:
 		// https://forum.obsidian.md/t/1-9-1-pdf-deep-links-to-some-text-selections-cannot-be-copied-text-selection-is-not-smooth/101227
 		// https://github.com/RyotaUshio/obsidian-pdf-reader/discussions/450
-		this.obsidianHasTextSelectionBug = requireApiVersion('1.9.0');
+		this.obsidianHasTextSelectionBug = requireApiVersion("1.9.0");
 
 		InstallerVersionModal.openIfNecessary(this);
 	}
 
 	private addIcons() {
 		// fill="currentColor" is necessary for the icon to inherit the color of the parent element!
-		addIcon('vim', '<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="48" fill="currentColor" style="letter-spacing:2; font-weight:bold;">VIM</text>');
+		addIcon(
+			"vim",
+			'<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial" font-size="48" fill="currentColor" style="letter-spacing:2; font-weight:bold;">VIM</text>',
+		);
 	}
 
 	getDefaultSettings() {
@@ -197,17 +240,23 @@ export default class PDFReader extends Plugin {
 
 		// The AnyStyle path had been saved in data.json until v0.39.3, but now it's saved in the local storage
 		if (!this.settings.anystylePath) {
-			const anystylePathFromLocalStorage = this.loadLocalStorage('anystylePath');
-			if (typeof anystylePathFromLocalStorage === 'string') {
+			const anystylePathFromLocalStorage = this.loadLocalStorage("anystylePath");
+			if (typeof anystylePathFromLocalStorage === "string") {
 				this.settings.anystylePath = anystylePathFromLocalStorage;
 			}
 		}
 
 		/** Correct invalid settings */
-		if (this.settings.defaultDisplayTextFormatIndex < 0 || this.settings.defaultDisplayTextFormatIndex >= this.settings.displayTextFormats.length) {
+		if (
+			this.settings.defaultDisplayTextFormatIndex < 0 ||
+			this.settings.defaultDisplayTextFormatIndex >= this.settings.displayTextFormats.length
+		) {
 			this.settings.defaultDisplayTextFormatIndex = 0;
 		}
-		if (this.settings.defaultColorPaletteActionIndex < 0 || this.settings.defaultColorPaletteActionIndex >= this.settings.copyCommands.length) {
+		if (
+			this.settings.defaultColorPaletteActionIndex < 0 ||
+			this.settings.defaultColorPaletteActionIndex >= this.settings.copyCommands.length
+		) {
 			this.settings.defaultColorPaletteActionIndex = 0;
 		}
 
@@ -219,13 +268,13 @@ export default class PDFReader extends Plugin {
 
 		/** migration from legacy settings */
 
-		if (this.settings.paneTypeForFirstMDLeaf as PaneType | '' === 'split') {
-			this.settings.paneTypeForFirstMDLeaf = 'right';
+		if ((this.settings.paneTypeForFirstMDLeaf as PaneType | "") === "split") {
+			this.settings.paneTypeForFirstMDLeaf = "right";
 		}
 
 		for (const cmd of this.settings.copyCommands) {
 			// @ts-ignore
-			if (cmd.hasOwnProperty('format')) {
+			if (cmd.hasOwnProperty("format")) {
 				// @ts-ignore
 				cmd.template = cmd.format;
 				// @ts-ignore
@@ -233,18 +282,20 @@ export default class PDFReader extends Plugin {
 			}
 		}
 
-		if (this.settings.hasOwnProperty('aliasFormat')) {
+		if (this.settings.hasOwnProperty("aliasFormat")) {
 			this.settings.displayTextFormats.push({
-				name: 'Custom',
+				name: "Custom",
 				// @ts-ignore
-				template: this.settings.aliasFormat
+				template: this.settings.aliasFormat,
 			});
 			// @ts-ignore
 			delete this.settings.aliasFormat;
 		}
 
-		if (this.settings.hasOwnProperty('showCopyLinkToSearchInContextMenu')) {
-			const searchSectionConfig = this.settings.contextMenuConfig.find(({ id }) => id === 'search');
+		if (this.settings.hasOwnProperty("showCopyLinkToSearchInContextMenu")) {
+			const searchSectionConfig = this.settings.contextMenuConfig.find(
+				({ id }) => id === "search",
+			);
 			if (searchSectionConfig) {
 				// @ts-ignore
 				searchSectionConfig.visible &&= this.settings.showCopyLinkToSearchInContextMenu;
@@ -254,18 +305,21 @@ export default class PDFReader extends Plugin {
 		}
 
 		// @ts-ignore
-		if (this.settings.showContextMenuOnMouseUpIf === 'mod') {
-			this.settings.showContextMenuOnMouseUpIf = 'Mod';
+		if (this.settings.showContextMenuOnMouseUpIf === "mod") {
+			this.settings.showContextMenuOnMouseUpIf = "Mod";
 		}
 
 		this.settings.enableEditEncryptedPDF = false;
 
-		this.renameSetting('enalbeWriteHighlightToFile', 'enablePDFEdit');
+		this.renameSetting("enalbeWriteHighlightToFile", "enablePDFEdit");
 
-		this.renameSetting('selectToCopyToggleRibbonIcon', 'autoCopyToggleRibbonIcon');
-		this.renameCommand('pdf-reader:toggle-select-to-copy', `${this.manifest.id}:toggle-auto-copy`);
+		this.renameSetting("selectToCopyToggleRibbonIcon", "autoCopyToggleRibbonIcon");
+		this.renameCommand(
+			"pdf-reader:toggle-select-to-copy",
+			`${this.manifest.id}:toggle-auto-copy`,
+		);
 
-		this.renameSetting('removeWhitespaceBetweenCJKChars', 'removeWhitespaceBetweenCJChars');
+		this.renameSetting("removeWhitespaceBetweenCJKChars", "removeWhitespaceBetweenCJChars");
 
 		this.loadContextMenuConfig();
 	}
@@ -292,7 +346,9 @@ export default class PDFReader extends Plugin {
 		const defaultConfig = this.getDefaultSettings().contextMenuConfig;
 		const config: typeof defaultConfig = [];
 		for (const defaultSectionConfig of defaultConfig) {
-			const existingSectionConfig = this.settings.contextMenuConfig.find(({ id }) => id === defaultSectionConfig.id);
+			const existingSectionConfig = this.settings.contextMenuConfig.find(
+				({ id }) => id === defaultSectionConfig.id,
+			);
 			config.push(existingSectionConfig ?? defaultSectionConfig);
 		}
 		this.settings.contextMenuConfig.length = 0;
@@ -307,32 +363,37 @@ export default class PDFReader extends Plugin {
 	}
 
 	checkDeprecatedSettings() {
-		if (document.querySelectorAll('.pdf-reader-deprecated-setting-notice').length > 0) {
+		if (document.querySelectorAll(".pdf-reader-deprecated-setting-notice").length > 0) {
 			return;
 		}
 
-		const showNotice = (settingId: keyof PDFReaderSettings, setMessage: (fragment: DocumentFragment, linkEl: HTMLAnchorElement) => void) => {
-
-			const notice = new Notice('', 0)
-				.setMessage(createFragment((el) => {
-					const linkEl = createEl('a', {
-						href: 'obsidian://pdf-reader?setting=' + settingId
+		const showNotice = (
+			settingId: keyof PDFReaderSettings,
+			setMessage: (fragment: DocumentFragment, linkEl: HTMLAnchorElement) => void,
+		) => {
+			const notice = new Notice("", 0).setMessage(
+				createFragment((el) => {
+					const linkEl = createEl("a", {
+						href: "obsidian://pdf-reader?setting=" + settingId,
 					});
-					el.append('PDF Reader: ');
+					el.append("PDF Reader: ");
 					setMessage(el, linkEl);
-				}));
-			notice.containerEl.addClass('pdf-reader-deprecated-setting-notice');
+				}),
+			);
+			notice.containerEl.addClass("pdf-reader-deprecated-setting-notice");
 			notice.messageEl.setCssStyles({
-				color: 'var(--text-warning)',
+				color: "var(--text-warning)",
 			});
 		};
 
 		if (this.settings.trimSelectionEmbed) {
-			showNotice('trimSelectionEmbed', (el, linkEl) => {
-				el.append('The option ');
-				linkEl.textContent = 'Trim selection/annotation embeds';
+			showNotice("trimSelectionEmbed", (el, linkEl) => {
+				el.append("The option ");
+				linkEl.textContent = "Trim selection/annotation embeds";
 				el.append(linkEl);
-				el.append(' is deprecated and will be removed in the near future. It is recommended to disable it and use the rectangular selection tool instead.');
+				el.append(
+					" is deprecated and will be removed in the near future. It is recommended to disable it and use the rectangular selection tool instead.",
+				);
 			});
 		}
 
@@ -350,47 +411,54 @@ export default class PDFReader extends Plugin {
 			return false;
 		};
 
-		const checkNamedTemplate = (settingId: KeysOfType<PDFReaderSettings, string | NamedTemplate[]>) => {
+		const checkNamedTemplate = (
+			settingId: KeysOfType<PDFReaderSettings, string | NamedTemplate[]>,
+		) => {
 			const setting = this.settings[settingId];
 			let shouldShowNotice = false;
 
-			if (typeof setting === 'string') {
-				shouldShowNotice = templateUsesVariable(setting, 'linkedFile') || templateUsesVariable(setting, 'linkedFileProperties');
+			if (typeof setting === "string") {
+				shouldShowNotice =
+					templateUsesVariable(setting, "linkedFile") ||
+					templateUsesVariable(setting, "linkedFileProperties");
 			} else if (Array.isArray(setting)) {
 				shouldShowNotice = setting.some(({ template }) => {
-					return templateUsesVariable(template, 'linkedFile') || templateUsesVariable(template, 'linkedFileProperties');
+					return (
+						templateUsesVariable(template, "linkedFile") ||
+						templateUsesVariable(template, "linkedFileProperties")
+					);
 				});
 			}
 
 			if (shouldShowNotice) {
 				showNotice(settingId, (el, linkEl) => {
-					el.append('The template variables ');
-					el.createEl('code', {
-						text: 'linkedFile'
+					el.append("The template variables ");
+					el.createEl("code", {
+						text: "linkedFile",
 					});
-					el.append(' and ');
-					el.createEl('code', {
-						text: 'linkedFileProperties'
+					el.append(" and ");
+					el.createEl("code", {
+						text: "linkedFileProperties",
 					});
-					el.append(' are deprecated and will be removed in the near future. Please ');
-					linkEl.textContent = 'remove them from your templates';
+					el.append(" are deprecated and will be removed in the near future. Please ");
+					linkEl.textContent = "remove them from your templates";
 					el.append(linkEl);
-					el.append('.');
+					el.append(".");
 				});
 			}
 		};
 
 		const settingIdsToCheck: KeysOfType<PDFReaderSettings, string | NamedTemplate[]>[] = [
-			'displayTextFormats',
-			'copyCommands',
-			'outlineLinkDisplayTextFormat',
-			'outlineLinkCopyFormat',
-			'thumbnailLinkDisplayTextFormat',
-			'thumbnailLinkCopyFormat',
-			'copyOutlineAsHeadingsDisplayTextFormat',
-			'copyOutlineAsListDisplayTextFormat',
-			'copyOutlineAsListFormat',
-			'copyOutlineAsHeadingsFormat',
+			"displayTextFormats",
+			"copyCommands",
+			"outlineLinkDisplayTextFormat",
+			"outlineLinkCopyFormat",
+			"thumbnailLinkDisplayTextFormat",
+			"thumbnailLinkCopyFormat",
+			"copyOutlineAsHeadingsDisplayTextFormat",
+			"copyOutlineAsListDisplayTextFormat",
+			"copyOutlineAsListFormat",
+			"copyOutlineAsHeadingsFormat",
 		];
 		settingIdsToCheck.forEach(checkNamedTemplate);
 	}
@@ -405,25 +473,30 @@ export default class PDFReader extends Plugin {
 			this.requiresDataviewInlineFieldsMigration = true;
 
 			const notice = new Notice(
-				createFragment((el) => el.append(
-					`PDF Reader: Please consider moving the "${this.settings.proxyMDProperty}" Dataview inline fields to the properties (YAML frontmatter).`,
-					createEl('br'),
-					'Click ',
-					createEl('a', {
-						text: 'here'
-					}, (a) => {
-						a.onclick = () => {
-							new DataviewInlineFieldsModal(this, files)
-								.open();
-						};
-					}),
-					' for more details.',
-				)),
-				0
+				createFragment((el) =>
+					el.append(
+						`PDF Reader: Please consider moving the "${this.settings.proxyMDProperty}" Dataview inline fields to the properties (YAML frontmatter).`,
+						createEl("br"),
+						"Click ",
+						createEl(
+							"a",
+							{
+								text: "here",
+							},
+							(a) => {
+								a.onclick = () => {
+									new DataviewInlineFieldsModal(this, files).open();
+								};
+							},
+						),
+						" for more details.",
+					),
+				),
+				0,
 			);
-			notice.containerEl.addClass('pdf-reader-deprecated-setting-notice');
+			notice.containerEl.addClass("pdf-reader-deprecated-setting-notice");
 			notice.messageEl.setCssStyles({
-				color: 'var(--text-warning)',
+				color: "var(--text-warning)",
 			});
 		});
 	}
@@ -432,25 +505,25 @@ export default class PDFReader extends Plugin {
 		const settings: any = Object.assign({}, this.settings);
 
 		// AnyStyle path: save to local storage, not to data.json
-		this.saveLocalStorage('anystylePath', settings.anystylePath);
+		this.saveLocalStorage("anystylePath", settings.anystylePath);
 		delete settings.anystylePath;
 
 		await this.saveData(settings);
 	}
 
 	loadLocalStorage(key: string) {
-		return this.app.loadLocalStorage(this.manifest.id + '-' + key);
+		return this.app.loadLocalStorage(this.manifest.id + "-" + key);
 	}
 
 	saveLocalStorage(key: string, value?: any) {
-		this.app.saveLocalStorage(this.manifest.id + '-' + key, value);
+		this.app.saveLocalStorage(this.manifest.id + "-" + key, value);
 	}
 
 	setCitationIdRegex() {
 		const sources = this.settings.citationIdPatterns
 			.split(/\r?\n/)
 			.filter((line) => line.trim());
-		this.citationIdRegex = new RegExp(sources.join('|'));
+		this.citationIdRegex = new RegExp(sources.join("|"));
 	}
 
 	/**
@@ -459,8 +532,8 @@ export default class PDFReader extends Plugin {
 	 */
 	private registerStyleSettings() {
 		// See https://github.com/mgmeyers/obsidian-style-settings?tab=readme-ov-file#plugin-support
-		this.app.workspace.trigger('parse-style-settings');
-		this.register(() => this.app.workspace.trigger('parse-style-settings'));
+		this.app.workspace.trigger("parse-style-settings");
+		this.register(() => this.app.workspace.trigger("parse-style-settings"));
 	}
 
 	private registerRibbonIcons() {
@@ -471,23 +544,29 @@ export default class PDFReader extends Plugin {
 		if (this.settings.autoFocusToggleRibbonIcon) {
 			let menuShown = false;
 
-			this.autoFocusToggleIconEl = this.addRibbonIcon(this.settings.autoFocusIconName, `${this.manifest.name}: Toggle auto-focus`, () => {
-				if (!menuShown) this.toggleAutoFocus();
-			});
-			this.autoFocusToggleIconEl.toggleClass('is-active', this.settings.autoFocus);
+			this.autoFocusToggleIconEl = this.addRibbonIcon(
+				this.settings.autoFocusIconName,
+				`${this.manifest.name}: Toggle auto-focus`,
+				() => {
+					if (!menuShown) this.toggleAutoFocus();
+				},
+			);
+			this.autoFocusToggleIconEl.toggleClass("is-active", this.settings.autoFocus);
 
-			this.registerDomEvent(this.autoFocusToggleIconEl, 'contextmenu', (evt) => {
+			this.registerDomEvent(this.autoFocusToggleIconEl, "contextmenu", (evt) => {
 				if (menuShown) return;
 
 				const menu = new Menu();
 				menu.addItem((item) => {
-					item.setIcon('lucide-settings')
-						.setTitle('Customize...')
+					item.setIcon("lucide-settings")
+						.setTitle("Customize...")
 						.onClick(() => {
-							this.openSettingTab().scrollToHeading('auto-focus');
+							this.openSettingTab().scrollToHeading("auto-focus");
 						});
 				});
-				menu.onHide(() => { menuShown = false; });
+				menu.onHide(() => {
+					menuShown = false;
+				});
 				menu.showAtMouseEvent(evt);
 				menuShown = true;
 			});
@@ -496,22 +575,28 @@ export default class PDFReader extends Plugin {
 		if (this.settings.autoPasteToggleRibbonIcon) {
 			let menuShown = false;
 
-			this.autoPasteToggleIconEl = this.addRibbonIcon(this.settings.autoPasteIconName, `${this.manifest.name}: Toggle auto-paste`, () => {
-				if (!menuShown) this.toggleAutoPaste();
-			});
-			this.autoPasteToggleIconEl.toggleClass('is-active', this.settings.autoPaste);
-			this.registerDomEvent(this.autoPasteToggleIconEl, 'contextmenu', (evt) => {
+			this.autoPasteToggleIconEl = this.addRibbonIcon(
+				this.settings.autoPasteIconName,
+				`${this.manifest.name}: Toggle auto-paste`,
+				() => {
+					if (!menuShown) this.toggleAutoPaste();
+				},
+			);
+			this.autoPasteToggleIconEl.toggleClass("is-active", this.settings.autoPaste);
+			this.registerDomEvent(this.autoPasteToggleIconEl, "contextmenu", (evt) => {
 				if (menuShown) return;
 
 				const menu = new Menu();
 				menu.addItem((item) => {
-					item.setIcon('lucide-settings')
-						.setTitle('Customize...')
+					item.setIcon("lucide-settings")
+						.setTitle("Customize...")
 						.onClick(() => {
-							this.openSettingTab().scrollToHeading('auto-paste');
+							this.openSettingTab().scrollToHeading("auto-paste");
 						});
 				});
-				menu.onHide(() => { menuShown = false; });
+				menu.onHide(() => {
+					menuShown = false;
+				});
 				menu.showAtMouseEvent(evt);
 				menuShown = true;
 			});
@@ -521,16 +606,16 @@ export default class PDFReader extends Plugin {
 	toggleAutoFocusRibbonIcon(enable?: boolean) {
 		const iconEl = this.autoFocusToggleIconEl;
 		if (iconEl) {
-			enable = enable ?? !iconEl.hasClass('is-active');
-			iconEl.toggleClass('is-active', enable);
+			enable = enable ?? !iconEl.hasClass("is-active");
+			iconEl.toggleClass("is-active", enable);
 		}
 	}
 
 	toggleAutoPasteRibbonIcon(enable?: boolean) {
 		const iconEl = this.autoPasteToggleIconEl;
 		if (iconEl) {
-			enable = enable ?? !iconEl.hasClass('is-active');
-			iconEl.toggleClass('is-active', enable);
+			enable = enable ?? !iconEl.hasClass("is-active");
+			iconEl.toggleClass("is-active", enable);
 		}
 	}
 
@@ -574,13 +659,16 @@ export default class PDFReader extends Plugin {
 		this.tryPatchUntilSuccess(patchClipboardManager);
 	}
 
-	tryPatchUntilSuccess(patcher: (plugin: PDFReader) => boolean, noticeOnFail?: () => Notice | undefined) {
+	tryPatchUntilSuccess(
+		patcher: (plugin: PDFReader) => boolean,
+		noticeOnFail?: () => Notice | undefined,
+	) {
 		this.app.workspace.onLayoutReady(() => {
 			const success = patcher(this);
 			if (!success) {
 				const notice = noticeOnFail?.();
 
-				const eventRef = this.app.workspace.on('layout-change', () => {
+				const eventRef = this.app.workspace.on("layout-change", () => {
 					const success = patcher(this);
 					if (success) {
 						this.app.workspace.offref(eventRef);
@@ -592,9 +680,9 @@ export default class PDFReader extends Plugin {
 		});
 	}
 
-	/** 
+	/**
 	 * Registers an HTML element that will be refreshed when a style setting is updated
-	 * and will be removed when the plugin gets unloaded. 
+	 * and will be removed when the plugin gets unloaded.
 	 */
 	registerEl<HTMLElementType extends HTMLElement>(el: HTMLElementType) {
 		this.register(() => el.remove());
@@ -606,26 +694,38 @@ export default class PDFReader extends Plugin {
 	}
 
 	private registerPDFEmbedCreator() {
-		const originalPDFEmbedCreator = this.app.embedRegistry.embedByExtension['pdf'];
+		const originalPDFEmbedCreator = this.app.embedRegistry.embedByExtension["pdf"];
 
 		this.register(() => {
-			this.app.embedRegistry.unregisterExtension('pdf');
-			this.app.embedRegistry.registerExtension('pdf', originalPDFEmbedCreator);
+			this.app.embedRegistry.unregisterExtension("pdf");
+			this.app.embedRegistry.registerExtension("pdf", originalPDFEmbedCreator);
 		});
 
-		this.app.embedRegistry.unregisterExtension('pdf');
-		this.app.embedRegistry.registerExtension('pdf', (ctx, file, subpath) => {
+		this.app.embedRegistry.unregisterExtension("pdf");
+		this.app.embedRegistry.registerExtension("pdf", (ctx, file, subpath) => {
 			const params = subpathToParams(subpath);
 
 			let embed: PDFEmbed | PDFCroppedEmbed | null = null;
 
-			if (params.has('rect') && params.has('page')) {
-				const pageNumber = parseInt(params.get('page')!);
-				const rect = params.get('rect')!.split(',').map((n) => parseFloat(n));
-				const width = params.has('width') ? parseFloat(params.get('width')!) : undefined;
-				const annotationId = params.get('annotation') ?? undefined;
+			if (params.has("rect") && params.has("page")) {
+				const pageNumber = parseInt(params.get("page")!);
+				const rect = params
+					.get("rect")!
+					.split(",")
+					.map((n) => parseFloat(n));
+				const width = params.has("width") ? parseFloat(params.get("width")!) : undefined;
+				const annotationId = params.get("annotation") ?? undefined;
 				if (Number.isInteger(pageNumber) && rect.length === 4) {
-					embed = new PDFCroppedEmbed(this, ctx, file, subpath, pageNumber, rect as Rect, width, annotationId);
+					embed = new PDFCroppedEmbed(
+						this,
+						ctx,
+						file,
+						subpath,
+						pageNumber,
+						rect as Rect,
+						width,
+						annotationId,
+					);
 				}
 			}
 
@@ -639,14 +739,17 @@ export default class PDFReader extends Plugin {
 			}
 
 			// Double-lick PDF embeds to open links
-			this.registerDomEvent(embed.containerEl, 'dblclick', (evt) => {
-				if (this.settings.dblclickEmbedToOpenLink
-					&& isTargetHTMLElement(evt, evt.target)
+			this.registerDomEvent(embed.containerEl, "dblclick", (evt) => {
+				if (
+					this.settings.dblclickEmbedToOpenLink &&
+					isTargetHTMLElement(evt, evt.target) &&
 					// .pdf-container is necessary to avoid opening links when double-clicking on the toolbar
-					&& (evt.target.closest('.pdf-embed[src] > .pdf-container') || evt.target.closest('.pdf-cropped-embed'))) {
+					(evt.target.closest(".pdf-embed[src] > .pdf-container") ||
+						evt.target.closest(".pdf-cropped-embed"))
+				) {
 					const linktext = file.path + subpath;
 					// we don't need sourcePath because linktext is the full path
-					this.app.workspace.openLinkText(linktext, '', Keymap.isModEvent(evt));
+					this.app.workspace.openLinkText(linktext, "", Keymap.isModEvent(evt));
 					evt.preventDefault();
 				}
 			});
@@ -654,29 +757,36 @@ export default class PDFReader extends Plugin {
 			// Make PDF embeds with a subpath unscrollable
 			if (this.settings.embedUnscrollable) {
 				for (const eventType of [
-					'wheel', // mousewheel
-					'touchmove' // finger swipe
+					"wheel", // mousewheel
+					"touchmove", // finger swipe
 				] as const) {
-					this.registerDomEvent(embed.containerEl, eventType, (evt) => {
-						if (isTargetHTMLElement(evt, evt.target)
-							&& evt.target.closest('.pdf-embed[src*="#"] .pdf-viewer-container')) {
-							evt.preventDefault();
-						}
-					}, { passive: false });
+					this.registerDomEvent(
+						embed.containerEl,
+						eventType,
+						(evt) => {
+							if (
+								isTargetHTMLElement(evt, evt.target) &&
+								evt.target.closest('.pdf-embed[src*="#"] .pdf-viewer-container')
+							) {
+								evt.preventDefault();
+							}
+						},
+						{ passive: false },
+					);
 				}
 			}
 
 			if (embed instanceof PDFCroppedEmbed) {
-				this.registerDomEvent(embed.containerEl, 'click', (evt) => {
-					if (isTargetHTMLElement(evt, evt.target) && evt.target.closest('.cm-editor')) {
+				this.registerDomEvent(embed.containerEl, "click", (evt) => {
+					if (isTargetHTMLElement(evt, evt.target) && evt.target.closest(".cm-editor")) {
 						// Prevent the click event causing the editor to select the link like an image embed
 						evt.preventDefault();
 					}
 				});
 			}
 
-			if (params.has('color')) {
-				embed.containerEl.dataset.highlightColor = params.get('color')!.toLowerCase();
+			if (params.has("color")) {
+				embed.containerEl.dataset.highlightColor = params.get("color")!.toLowerCase();
 			} else if (this.settings.defaultColor) {
 				embed.containerEl.dataset.highlightColor = this.settings.defaultColor.toLowerCase();
 			}
@@ -686,7 +796,8 @@ export default class PDFReader extends Plugin {
 
 	private registerGlobalVariable(name: string, value: any, throwError: boolean = true) {
 		if (name in window) {
-			if (throwError) throw new Error(`${this.manifest.name}: Global variable "${name}" already exists.`);
+			if (throwError)
+				throw new Error(`${this.manifest.name}: Global variable "${name}" already exists.`);
 			else return;
 		}
 		// @ts-ignore
@@ -696,77 +807,102 @@ export default class PDFReader extends Plugin {
 	}
 
 	private registerGlobalVariables() {
-		this.registerGlobalVariable('pdfReader', this, false);
-		this.registerGlobalVariable('pdflib', pdflib, false);
+		this.registerGlobalVariable("pdfReader", this, false);
+		this.registerGlobalVariable("pdflib", pdflib, false);
 	}
 
 	private registerEvents() {
 		// keep this.pdfViewerChildren up-to-date
-		this.registerEvent(this.app.workspace.on('layout-change', () => {
-			for (const pdfContainerEl of this.pdfViewerChildren.keys()) {
-				if (!pdfContainerEl?.isShown()) this.pdfViewerChildren.delete(pdfContainerEl);
-			}
-		}));
+		this.registerEvent(
+			this.app.workspace.on("layout-change", () => {
+				for (const pdfContainerEl of this.pdfViewerChildren.keys()) {
+					if (!pdfContainerEl?.isShown()) this.pdfViewerChildren.delete(pdfContainerEl);
+				}
+			}),
+		);
 
 		// Sync the external app with Obsidian
 		if (Platform.isDesktopApp) {
-			this.registerEvent(this.app.workspace.on('active-leaf-change', (leaf) => {
-				if (this.settings.syncWithDefaultApp && leaf && this.lib.isPDFView(leaf.view)) {
-					const file = leaf.view.file;
-					if (file) {
-						this.app.openWithDefaultApp(file.path);
-						if (this.settings.focusObsidianAfterOpenPDFWithDefaultApp) {
-							focusObsidian();
+			this.registerEvent(
+				this.app.workspace.on("active-leaf-change", (leaf) => {
+					if (this.settings.syncWithDefaultApp && leaf && this.lib.isPDFView(leaf.view)) {
+						const file = leaf.view.file;
+						if (file) {
+							this.app.openWithDefaultApp(file.path);
+							if (this.settings.focusObsidianAfterOpenPDFWithDefaultApp) {
+								focusObsidian();
+							}
 						}
 					}
-				}
-			}));
+				}),
+			);
 		}
 
 		// Keep the last-pasted file up-to-date
-		this.registerEvent(this.app.vault.on('delete', (file) => {
-			if (file instanceof TFile && file === this.lastPasteFile) {
-				this.lastPasteFile = null;
-			}
-		}));
+		this.registerEvent(
+			this.app.vault.on("delete", (file) => {
+				if (file instanceof TFile && file === this.lastPasteFile) {
+					this.lastPasteFile = null;
+				}
+			}),
+		);
 		// See also: lib.copyLink.watchPaste()
 
 		// Keep the template path for the command "Create new note for auto-focus or auto-paste" up-to-date
-		this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
-			if (file instanceof TFile && this.settings.newFileTemplatePath === oldPath) {
-				this.settings.newFileTemplatePath = file.path;
-				this.saveSettings();
-			}
-		}));
-		this.registerEvent(this.app.vault.on('delete', (file) => {
-			if (file instanceof TFile && this.settings.newFileTemplatePath === file.path) {
-				this.settings.newFileTemplatePath = '';
-				this.saveSettings();
-			}
-		}));
+		this.registerEvent(
+			this.app.vault.on("rename", (file, oldPath) => {
+				if (file instanceof TFile && this.settings.newFileTemplatePath === oldPath) {
+					this.settings.newFileTemplatePath = file.path;
+					this.saveSettings();
+				}
+			}),
+		);
+		this.registerEvent(
+			this.app.vault.on("delete", (file) => {
+				if (file instanceof TFile && this.settings.newFileTemplatePath === file.path) {
+					this.settings.newFileTemplatePath = "";
+					this.saveSettings();
+				}
+			}),
+		);
 
 		// Keep the vimrc content up-to-date
-		this.registerEvent(this.app.vault.on('modify', async (file) => {
-			if (file instanceof TFile && file.path === this.settings.vimrcPath) {
-				this.vimrc = await this.app.vault.read(file);
-			}
-		}));
+		this.registerEvent(
+			this.app.vault.on("modify", async (file) => {
+				if (file instanceof TFile && file.path === this.settings.vimrcPath) {
+					this.vimrc = await this.app.vault.read(file);
+				}
+			}),
+		);
 
 		// Clean up other resources when the app quits
-		this.registerEvent(this.app.workspace.on('quit', async () => {
-			await this.cleanUpResources();
-		}));
+		this.registerEvent(
+			this.app.workspace.on("quit", async () => {
+				await this.cleanUpResources();
+			}),
+		);
 
-		// 
+		//
 		// https://github.com/RyotaUshio/obsidian-pdf-reader/issues/285
-		this.registerEvent(this.app.workspace.on('editor-drop', (evt, editor, info) => this.lib.dummyFileManager.createDummyFilesOnEditorDrop(evt, editor, info)));
+		this.registerEvent(
+			this.app.workspace.on("editor-drop", (evt, editor, info) =>
+				this.lib.dummyFileManager.createDummyFilesOnEditorDrop(evt, editor, info),
+			),
+		);
 	}
 
-	registerOneTimeEvent<T extends Events>(events: T, ...[evt, callback, ctx]: OverloadParameters<T['on']>) {
-		const eventRef = events.on(evt, (...args: any[]) => {
-			callback.call(ctx, ...args);
-			events.offref(eventRef);
-		}, ctx);
+	registerOneTimeEvent<T extends Events>(
+		events: T,
+		...[evt, callback, ctx]: OverloadParameters<T["on"]>
+	) {
+		const eventRef = events.on(
+			evt,
+			(...args: any[]) => {
+				callback.call(ctx, ...args);
+				events.offref(eventRef);
+			},
+			ctx,
+		);
 		this.registerEvent(eventRef);
 	}
 
@@ -778,53 +914,57 @@ export default class PDFReader extends Plugin {
 		});
 		if (result.shouldUpdate) {
 			this.app.workspace.onLayoutReady(() => {
-				new Notice(createFragment((el) => {
-					el.append(
-						'PDF Reader: There is a newer version available! ',
-						createEl('a', {
-							text: 'Update now',
-							href: 'obsidian://show-plugin?id=pdf-reader',
-						})
-					);
-				}));
+				new Notice(
+					createFragment((el) => {
+						el.append(
+							"PDF Reader: There is a newer version available! ",
+							createEl("a", {
+								text: "Update now",
+								href: "obsidian://show-plugin?id=pdf-reader",
+							}),
+						);
+					}),
+				);
 			});
 		}
 	}
 
 	private registerAutoCheckForUpdates() {
 		this.checkForUpdatesIfNeeded();
-		this.registerInterval(window.setInterval(() => this.checkForUpdatesIfNeeded(), 1000 * 60 * 60 * 24));
+		this.registerInterval(
+			window.setInterval(() => this.checkForUpdatesIfNeeded(), 1000 * 60 * 60 * 24),
+		);
 	}
 
 	private registerHoverLinkSources() {
-		this.registerHoverLinkSource('pdf-reader', {
+		this.registerHoverLinkSource("pdf-reader", {
 			defaultMod: true,
-			display: 'PDF Reader: backlink highlights'
+			display: "PDF Reader: backlink highlights",
 		});
 
 		this.registerHoverLinkSource(PDFInternalLinkPostProcessor.HOVER_LINK_SOURCE_ID, {
 			defaultMod: true,
-			display: 'PDF Reader: internal links in PDF (except for citations)'
+			display: "PDF Reader: internal links in PDF (except for citations)",
 		});
 
 		this.registerHoverLinkSource(BibliographyManager.HOVER_LINK_SOURCE_ID, {
 			defaultMod: false,
-			display: 'PDF Reader: citation links in PDF'
+			display: "PDF Reader: citation links in PDF",
 		});
 
 		this.registerHoverLinkSource(PDFExternalLinkPostProcessor.HOVER_LINK_SOURCE_ID, {
 			defaultMod: true,
-			display: 'PDF Reader: external links in PDF'
+			display: "PDF Reader: external links in PDF",
 		});
 
 		this.registerHoverLinkSource(PDFOutlineItemPostProcessor.HOVER_LINK_SOURCE_ID, {
 			defaultMod: true,
-			display: 'PDF Reader: outlines (bookmarks)'
+			display: "PDF Reader: outlines (bookmarks)",
 		});
 
 		this.registerHoverLinkSource(PDFThumbnailItemPostProcessor.HOVER_LINK_SOURCE_ID, {
 			defaultMod: true,
-			display: 'PDF Reader: thumbnails'
+			display: "PDF Reader: thumbnails",
 		});
 	}
 
@@ -838,48 +978,89 @@ export default class PDFReader extends Plugin {
 		workspace.onLayoutReady(() => {
 			// initialize lastActiveMarkdownFile
 			const activeFile = workspace.getActiveFile();
-			if (activeFile && activeFile.extension === 'md') {
+			if (activeFile && activeFile.extension === "md") {
 				this.lastActiveMarkdownFile = activeFile;
 			} else {
-				const lastActiveMarkdownPath = workspace.recentFileTracker.getRecentFiles({
-					showMarkdown: true, showCanvas: false, showNonImageAttachments: false, showImages: false, maxCount: 1
-				}).first();
+				const lastActiveMarkdownPath = workspace.recentFileTracker
+					.getRecentFiles({
+						showMarkdown: true,
+						showCanvas: false,
+						showNonImageAttachments: false,
+						showImages: false,
+						maxCount: 1,
+					})
+					.first();
 				if (lastActiveMarkdownPath) {
-					const lastActiveMarkdownFile = vault.getAbstractFileByPath(lastActiveMarkdownPath);
-					if (lastActiveMarkdownFile instanceof TFile && lastActiveMarkdownFile.extension === 'md') {
+					const lastActiveMarkdownFile =
+						vault.getAbstractFileByPath(lastActiveMarkdownPath);
+					if (
+						lastActiveMarkdownFile instanceof TFile &&
+						lastActiveMarkdownFile.extension === "md"
+					) {
 						this.lastActiveMarkdownFile = lastActiveMarkdownFile;
 					}
 				}
 			}
 
 			// track active markdown file
-			this.registerEvent(workspace.on('file-open', (file) => {
-				if (file instanceof TFile && file.extension === 'md') {
-					this.lastActiveMarkdownFile = file;
-				}
-			}));
-			this.registerEvent(vault.on('delete', (file) => {
-				if (file instanceof TFile && file === this.lastActiveMarkdownFile) {
-					this.lastActiveMarkdownFile = null;
-				}
-			}));
+			this.registerEvent(
+				workspace.on("file-open", (file) => {
+					if (file instanceof TFile && file.extension === "md") {
+						this.lastActiveMarkdownFile = file;
+					}
+				}),
+			);
+			this.registerEvent(
+				vault.on("delete", (file) => {
+					if (file instanceof TFile && file === this.lastActiveMarkdownFile) {
+						this.lastActiveMarkdownFile = null;
+					}
+				}),
+			);
 		});
 	}
 
 	obsidianProtocolHandler(params: ObsidianProtocolData) {
-		if ('create-dummy' in params) {
+		if ("create-dummy" in params) {
 			return this.lib.dummyFileManager.createDummyFilesFromObsidianUrl(params);
 		}
 
-		if ('setting' in params) {
+		if ("setting" in params) {
 			return this.settingTab.openFromObsidianUrl(params);
 		}
 	}
 
-	on(evt: 'highlight', callback: (data: { type: 'selection' | 'annotation', source: 'obsidian' | 'pdf-reader', pageNumber: number, child: PDFViewerChild }) => any, context?: any): EventRef;
-	on(evt: 'color-palette-state-change', callback: (data: { source: ColorPalette }) => any, context?: any): EventRef;
-	on(evt: 'update-dom', callback: () => any, context?: any): EventRef;
-	on(evt: 'adapt-to-theme-change', callback: (data: { adapt: boolean }) => any, context?: any): EventRef;
+	on(
+		evt: "highlight",
+		callback: (data: {
+			type: "selection" | "annotation";
+			source: "obsidian" | "pdf-reader";
+			pageNumber: number;
+			child: PDFViewerChild;
+		}) => any,
+		context?: any,
+	): EventRef;
+	on(
+		evt: "color-palette-state-change",
+		callback: (data: { source: ColorPalette }) => any,
+		context?: any,
+	): EventRef;
+	on(evt: "update-dom", callback: () => any, context?: any): EventRef;
+	on(
+		evt: "adapt-to-theme-change",
+		callback: (data: { adapt: boolean }) => any,
+		context?: any,
+	): EventRef;
+	on(
+		evt: "pdf-reader:annotation-modified",
+		callback: (data: { file: TFile; page: number; id: string }) => any,
+		context?: any,
+	): EventRef;
+	on(
+		evt: "pdf-reader:annotation-deleted",
+		callback: (data: { file: TFile; page: number; id: string }) => any,
+		context?: any,
+	): EventRef;
 
 	on(evt: string, callback: (...data: any) => any, context?: any): EventRef {
 		return this.events.on(evt, callback, context);
@@ -893,20 +1074,38 @@ export default class PDFReader extends Plugin {
 		this.events.offref(ref);
 	}
 
-	trigger(evt: 'highlight', data: { type: 'selection' | 'annotation', source: 'obsidian' | 'pdf-reader', pageNumber: number, child: PDFViewerChild }): void;
-	trigger(evt: 'color-palette-state-change', data: { source: ColorPalette }): void;
-	trigger(evt: 'update-dom'): void;
-	trigger(evt: 'adapt-to-theme-change', data: { adapt: boolean }): void;
+	trigger(
+		evt: "highlight",
+		data: {
+			type: "selection" | "annotation";
+			source: "obsidian" | "pdf-reader";
+			pageNumber: number;
+			child: PDFViewerChild;
+		},
+	): void;
+	trigger(evt: "color-palette-state-change", data: { source: ColorPalette }): void;
+	trigger(evt: "update-dom"): void;
+	trigger(evt: "adapt-to-theme-change", data: { adapt: boolean }): void;
+	trigger(
+		evt: "pdf-reader:annotation-modified",
+		data: { file: TFile; page: number; id: string },
+	): void;
+	trigger(
+		evt: "pdf-reader:annotation-deleted",
+		data: { file: TFile; page: number; id: string },
+	): void;
 
 	trigger(evt: string, ...args: any[]): void {
 		this.events.trigger(evt, ...args);
 	}
 
-	requireModKeyForLinkHover(id = 'pdf-reader') {
+	requireModKeyForLinkHover(id = "pdf-reader") {
 		// @ts-ignore
-		return this.app.internalPlugins.plugins['page-preview'].instance.overrides[id]
-			?? this.app.workspace.hoverLinkSources[id]?.defaultMod
-			?? false;
+		return (
+			this.app.internalPlugins.plugins["page-preview"].instance.overrides[id] ??
+			this.app.workspace.hoverLinkSources[id]?.defaultMod ??
+			false
+		);
 	}
 
 	openSettingTab(): PDFReaderSettingTab {
@@ -922,7 +1121,7 @@ export default class PDFReader extends Plugin {
 
 	openHotkeySettingTab(query?: string): SettingTab {
 		this.app.setting.open();
-		const tab = this.app.setting.openTabById('hotkeys');
+		const tab = this.app.setting.openTabById("hotkeys");
 		tab.setQuery(query ?? this.manifest.id);
 		return tab;
 	}
@@ -930,7 +1129,7 @@ export default class PDFReader extends Plugin {
 	getAnyStyleInputDir() {
 		const pdfReaderDirPath = this.manifest.dir;
 		if (pdfReaderDirPath) {
-			return pdfReaderDirPath + '/anystyle';
+			return pdfReaderDirPath + "/anystyle";
 		}
 		return null;
 	}
