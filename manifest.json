@@ -1,10 +1,10 @@
 {
-    "id": "pdf-reader",
-    "name": "PDF Reader",
-    "version": "1.0.0",
-    "minAppVersion": "1.5.8",
-    "description": "An Obsidian-native PDF annotation tool.",
-    "author": "Lebenswille",
-    "authorUrl": "https://github.com/Lebenswille",
-    "isDesktopOnly": false
+	"id": "pdf-reader",
+	"name": "PDF Reader",
+	"version": "1.0.0",
+	"minAppVersion": "1.5.8",
+	"description": "An Obsidian-native PDF annotation tool.",
+	"author": "Lebenswille",
+	"authorUrl": "https://github.com/Lebenswille",
+	"isDesktopOnly": false
 }
