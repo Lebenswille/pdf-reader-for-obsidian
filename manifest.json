@@ -3,7 +3,6 @@
 	"name": "PDF Reader",
 	"version": "1.0.4",
 	"minAppVersion": "1.5.8",
-	"description": "An Obsidian-native PDF annotation tool.",
 	"author": "Lebenswille",
 	"authorUrl": "https://github.com/Lebenswille",
 	"isDesktopOnly": false

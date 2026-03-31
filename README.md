@@ -22,7 +22,6 @@ The core logic of this plugin provides several powerful features:
 ## Getting Started
 
 ### 1. Installation
-*   **Beta (BRAT)**: Add the repository `Lebenswille/obsidian-pdf-reader` in the [BRAT](https://github.com/TfTHacker/obsidian42-brat) settings.
 *   **Manual**: Download the `main.js`, `manifest.json`, and `styles.css` from the latest release and place them in `.obsidian/plugins/pdf-reader/`.
 
 ### 2. Basic Usage

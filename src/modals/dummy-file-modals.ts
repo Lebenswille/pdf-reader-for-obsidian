@@ -41,7 +41,7 @@ export class DummyFileModal extends PDFReaderModal {
 					);
 					el.createEl("a", {
 						text: "Learn more about dummy PDF files",
-						href: "https://ryotaushio.github.io/obsidian-pdf-reader/external-pdf-files",
+						href: "https://github.com/Lebenswille/pdf-reader-for-obsidian#readme",
 					});
 				}),
 			);
@@ -136,6 +136,24 @@ export class DummyFileModal extends PDFReaderModal {
 			.setDesc(
 				'Type the path in the input box or click the "Browse" button to select the file.',
 			)
+			.addExtraButton((button) => {
+				button
+					.setIcon("folder")
+					.setTooltip("Browse")
+					.onClick(() => {
+						const electron = (window as any).electron;
+						if (electron) {
+							const result = electron.remote.dialog.showOpenDialogSync({
+								properties: ["openFile", "multiSelections"],
+								filters: [{ name: "PDF files", extensions: ["pdf"] }],
+							});
+							if (result) {
+								this.uris.push(...result.map((path: string) => "file://" + path));
+								this.display();
+							}
+						}
+					});
+			})
 			.addExtraButton((button) => {
 				button
 					.setIcon("plus")

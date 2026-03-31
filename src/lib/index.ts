@@ -1299,7 +1299,7 @@ export class PDFReaderLib {
 	}> {
 		const { result: response, error: requestError } = await tryCatchAsync(
 			requestUrl({
-				url: "https://api.github.com/repos/ryotaushio/obsidian-pdf-reader/releases?per_page=10&page=1",
+				url: "https://api.github.com/repos/Lebenswille/pdf-reader-for-obsidian/releases?per_page=10&page=1",
 				headers: {
 					accept: "application/vnd.github+json",
 					"X-GitHub-Api-Version": "2022-11-28",
