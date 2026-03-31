@@ -1100,9 +1100,8 @@ export default class PDFReader extends Plugin {
 	}
 
 	requireModKeyForLinkHover(id = "pdf-reader") {
-		// @ts-ignore
 		return (
-			this.app.internalPlugins.plugins["page-preview"].instance.overrides[id] ??
+			(this.app.internalPlugins.plugins["page-preview"].instance as any).overrides[id] ??
 			this.app.workspace.hoverLinkSources[id]?.defaultMod ??
 			false
 		);

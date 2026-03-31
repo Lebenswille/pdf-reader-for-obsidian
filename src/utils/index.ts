@@ -410,12 +410,11 @@ export async function getObsidianDebugInfo(app: App) {
 }
 
 export function getStyleSettings(app: App) {
-	// @ts-ignore
-	const fullStyleSettings =
-		app.plugins.plugins["obsidian-style-settings"]?.settingsManager.settings;
+	const fullStyleSettings = (app.plugins.plugins["obsidian-style-settings"] as any)?.settingsManager
+		.settings;
 	const pdfReaderStyleSettings = fullStyleSettings
 		? Object.fromEntries(
-				Object.entries(fullStyleSettings).filter(([key]) => key.startsWith("pdf-reader@@")),
+				Object.entries(fullStyleSettings as any).filter(([key]) => key.startsWith("pdf-reader@@")),
 			)
 		: null;
 	return pdfReaderStyleSettings;

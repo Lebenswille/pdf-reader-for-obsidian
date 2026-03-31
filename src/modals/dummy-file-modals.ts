@@ -136,25 +136,6 @@ export class DummyFileModal extends PDFReaderModal {
 			.setDesc(
 				'Type the path in the input box or click the "Browse" button to select the file.',
 			)
-			.addButton((button) => {
-				button
-					.setButtonText("Browse")
-					.setCta()
-					.onClick(() => {
-						// @ts-ignore
-						const paths: string[] | undefined =
-							window.electron?.remote.dialog.showOpenDialogSync({
-								properties: ["openFile", "multiSelections", "dontAddToRecent"],
-								filters: [{ name: "PDF files", extensions: ["pdf"] }],
-							});
-						if (paths && paths.length > 0) {
-							this.uris = paths.map((path) =>
-								this.lib.dummyFileManager.absolutePathToFileUri(path),
-							);
-							this.display();
-						}
-					});
-			})
 			.addExtraButton((button) => {
 				button
 					.setIcon("plus")

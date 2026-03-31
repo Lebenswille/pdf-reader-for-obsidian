@@ -392,12 +392,6 @@ export class PDFReaderContextMenu extends PDFReaderMenu {
 						`Look up "${selectedText.length <= 25 ? selectedText : selectedText.slice(0, 24).trim() + "…"}"`,
 					)
 					.setIcon("lucide-library")
-					.onClick(() => {
-						// @ts-ignore
-						this.win
-							.electron!.remote.getCurrentWebContents()
-							.showDefinitionForSelection();
-					});
 			});
 		}
 
