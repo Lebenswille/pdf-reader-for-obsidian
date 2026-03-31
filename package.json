@@ -1,6 +1,6 @@
 {
     "name": "obsidian-pdf-reader",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "The most Obsidian-native PDF annotation tool ever.",
     "scripts": {
         "dev": "node esbuild.config.mjs",
