@@ -458,7 +458,12 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 
 					const palette = this.lib.getColorPaletteFromChild(child);
 					palette?.setStatus("Link copied", this.statusDurationMs);
-					this.autoFocusOrAutoPaste(evaluated, autoPaste, palette ?? undefined);
+					this.autoFocusOrAutoPaste(
+						evaluated,
+						autoPaste,
+						palette ?? undefined,
+						file,
+					);
 
 					// TODO: Needs refactor
 					const result = parsePDFSubpath(subpath);
@@ -540,7 +545,7 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 				const palette = this.lib.getColorPaletteFromChild(child);
 				// This can be redundant because the copy button already shows the status.
 				if (shouldShowStatus) palette?.setStatus("Link copied", this.statusDurationMs);
-				this.autoFocusOrAutoPaste(evaluated, autoPaste, palette ?? undefined);
+				this.autoFocusOrAutoPaste(evaluated, autoPaste, palette ?? undefined, file);
 
 				// TODO: Needs refactor
 				const rect = annotData?.rect;
@@ -593,7 +598,7 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 
 				const palette = this.lib.getColorPaletteFromChild(child);
 				palette?.setStatus("Link copied", this.statusDurationMs);
-				this.autoFocusOrAutoPaste(evaluated, autoPaste, palette ?? undefined);
+				this.autoFocusOrAutoPaste(evaluated, autoPaste, palette ?? undefined, file);
 			})();
 		}
 
@@ -778,7 +783,7 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 				};
 
 				palette?.setStatus("Link copied", this.statusDurationMs);
-				await this.autoFocusOrAutoPaste(text, autoPaste, palette ?? undefined);
+				await this.autoFocusOrAutoPaste(text, autoPaste, palette ?? undefined, file);
 			})();
 		}
 
@@ -817,7 +822,7 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 					this.onCopyFinish(link);
 				}
 				palette?.setStatus("Link copied", this.statusDurationMs);
-				await this.autoFocusOrAutoPaste(link, autoPaste, palette ?? undefined);
+				await this.autoFocusOrAutoPaste(link, autoPaste, palette ?? undefined, file);
 			})();
 		}
 
@@ -898,19 +903,20 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 		return true;
 	}
 
-	async autoPaste(text: string): Promise<boolean> {
+	async autoPaste(text: string, sourcePDFFile?: TFile | null): Promise<boolean> {
 		// Merge auto sync logic: prioritize associated note if autoSync is enabled
 		let file: TFile | null = null;
+		const pdfFile = sourcePDFFile ?? this.lib.workspace.getActivePDFView()?.file ?? null;
 
-		if (this.settings.autoSync) {
-			const activePDFView = this.lib.workspace.getActivePDFView();
-			if (activePDFView && activePDFView.file) {
-				file = await this.lib.sync.getNoteFileFromPDF(activePDFView.file);
-			}
+		if (this.settings.autoSync && pdfFile) {
+			file = await this.lib.sync.getNoteFileFromPDF(pdfFile);
 		}
 
 		if (!file) {
-			file = await this.getAutoFocusOrAutoPasteTarget(this.settings.autoPasteTarget);
+			file = await this.getAutoFocusOrAutoPasteTarget(
+				this.settings.autoPasteTarget,
+				pdfFile,
+			);
 		}
 
 		if (file) {
@@ -996,8 +1002,11 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 		});
 	}
 
-	async autoFocus(): Promise<boolean> {
-		const file = await this.getAutoFocusOrAutoPasteTarget(this.settings.autoFocusTarget);
+	async autoFocus(sourcePDFFile?: TFile | null): Promise<boolean> {
+		const file = await this.getAutoFocusOrAutoPasteTarget(
+			this.settings.autoFocusTarget,
+			sourcePDFFile ?? this.lib.workspace.getActivePDFView()?.file ?? null,
+		);
 
 		if (file) {
 			// auto-focus target found
@@ -1041,9 +1050,13 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 		return this.app.commands.executeCommandById(command.id);
 	}
 
-	async getAutoFocusOrAutoPasteTarget(target: AutoFocusTarget): Promise<TFile | null> {
+	async getAutoFocusOrAutoPasteTarget(
+		target: AutoFocusTarget,
+		sourcePDFFile?: TFile | null,
+	): Promise<TFile | null> {
 		const lastActiveFile = this.plugin.lastActiveMarkdownFile;
 		const lastPasteFile = this.plugin.lastPasteFile;
+		const pdfFile = sourcePDFFile ?? this.lib.workspace.getActivePDFView()?.file ?? null;
 		const isLastActiveFileOpened = !!(
 			lastActiveFile && this.lib.workspace.isMarkdownFileOpened(lastActiveFile)
 		);
@@ -1061,11 +1074,8 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 		} else if (target === "last-active-and-open-then-last-paste") {
 			if (isLastActiveFileOpened) targetFile = lastActiveFile;
 			else if (lastPasteFile) targetFile = lastPasteFile;
-		} else if (target === "associated-note") {
-			const activePDFView = this.lib.workspace.getActivePDFView();
-			if (activePDFView && activePDFView.file) {
-				targetFile = await this.lib.sync.ensureNoteForPDF(activePDFView.file);
-			}
+		} else if (target === "associated-note" && pdfFile) {
+			targetFile = await this.lib.sync.ensureNoteForPDF(pdfFile);
 		}
 
 		if (targetFile && targetFile.extension === "md") {
@@ -1289,9 +1299,14 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 	 * @param autoPaste True if called via the auto-paste commands and false otherwise even if the auto-paste toggle is on.
 	 * @param palette The relevant color palette instance whose status text will be updated.
 	 */
-	async autoFocusOrAutoPaste(evaluated: string, autoPaste?: boolean, palette?: ColorPalette) {
+	async autoFocusOrAutoPaste(
+		evaluated: string,
+		autoPaste?: boolean,
+		palette?: ColorPalette,
+		sourcePDFFile?: TFile | null,
+	) {
 		if (autoPaste || this.settings.autoPaste) {
-			const success = await this.autoPaste(evaluated);
+			const success = await this.autoPaste(evaluated, sourcePDFFile);
 			if (success) {
 				palette?.setStatus("Link copied & pasted", this.statusDurationMs);
 				if (
@@ -1313,7 +1328,7 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 				);
 		} else {
 			if (this.settings.autoFocus) {
-				const success = await this.autoFocus();
+				const success = await this.autoFocus(sourcePDFFile);
 				if (!success)
 					palette?.setStatus(
 						"Link copied but paste target not identified",
