@@ -218,6 +218,8 @@ export class ColorPalette extends PDFReaderComponent {
 				name ?? undefined,
 				true,
 				comment,
+				false,
+				true,
 			);
 		} else {
 			this.lib.copyLink.copyLinkToSelection(
@@ -226,6 +228,8 @@ export class ColorPalette extends PDFReaderComponent {
 				name ?? undefined,
 				true,
 				comment,
+				false,
+				true,
 			);
 		}
 

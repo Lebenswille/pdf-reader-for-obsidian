@@ -124,6 +124,8 @@ export class SelectionToolbar extends Component {
 				colorName ?? undefined,
 				true,
 				commentToUse,
+				false,
+				true,
 			);
 		} else {
 			this.plugin.lib.copyLink.copyLinkToSelection(
@@ -132,6 +134,8 @@ export class SelectionToolbar extends Component {
 				colorName ?? undefined,
 				true,
 				commentToUse,
+				false,
+				true,
 			);
 		}
 

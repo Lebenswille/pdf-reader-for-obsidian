@@ -417,6 +417,8 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 		colorName?: string,
 		autoPaste?: boolean,
 		comment?: string,
+		skipAutoFocusOrPaste: boolean = false,
+		silentAutoPaste: boolean = false,
 	): boolean {
 		const variables = this.getTemplateVariables(
 			colorName ? { color: colorName.toLowerCase() } : {},
@@ -458,12 +460,15 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 
 					const palette = this.lib.getColorPaletteFromChild(child);
 					palette?.setStatus("Link copied", this.statusDurationMs);
-					this.autoFocusOrAutoPaste(
-						evaluated,
-						autoPaste,
-						palette ?? undefined,
-						file,
-					);
+					if (!skipAutoFocusOrPaste) {
+						this.autoFocusOrAutoPaste(
+							evaluated,
+							autoPaste,
+							palette ?? undefined,
+							file,
+							silentAutoPaste,
+						);
+					}
 
 					// TODO: Needs refactor
 					const result = parsePDFSubpath(subpath);
@@ -574,6 +579,8 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 		colorName: string,
 		autoPaste?: boolean,
 		comment?: string,
+		skipAutoFocusOrPaste: boolean = false,
+		silentAutoPaste: boolean = false,
 	) {
 		if (!checking) {
 			(async () => {
@@ -598,7 +605,15 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 
 				const palette = this.lib.getColorPaletteFromChild(child);
 				palette?.setStatus("Link copied", this.statusDurationMs);
-				this.autoFocusOrAutoPaste(evaluated, autoPaste, palette ?? undefined, file);
+				if (!skipAutoFocusOrPaste) {
+					this.autoFocusOrAutoPaste(
+						evaluated,
+						autoPaste,
+						palette ?? undefined,
+						file,
+						silentAutoPaste,
+					);
+				}
 			})();
 		}
 
@@ -612,6 +627,8 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 		colorName?: string,
 		autoPaste?: boolean,
 		comment?: string,
+		skipAutoFocusOrPaste: boolean = false,
+		silentAutoPaste: boolean = false,
 	): boolean {
 		const selection = activeWindow.getSelection();
 		if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return false;
@@ -656,6 +673,8 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 							rgbStr,
 							autoPaste,
 							comment,
+							skipAutoFocusOrPaste,
+							silentAutoPaste,
 						);
 
 						if (rects) {
@@ -903,7 +922,11 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 		return true;
 	}
 
-	async autoPaste(text: string, sourcePDFFile?: TFile | null): Promise<boolean> {
+	async autoPaste(
+		text: string,
+		sourcePDFFile?: TFile | null,
+		silent: boolean = false,
+	): Promise<boolean> {
 		// Merge auto sync logic: prioritize associated note if autoSync is enabled
 		let file: TFile | null = null;
 		const pdfFile = sourcePDFFile ?? this.lib.workspace.getActivePDFView()?.file ?? null;
@@ -930,7 +953,7 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 				}
 			}
 
-			await this.pasteTextToFile(text, file);
+			await this.pasteTextToFile(text, file, silent);
 			this.plugin.lastPasteFile = file;
 			return true;
 		}
@@ -1304,9 +1327,10 @@ export class copyLinkLib extends PDFReaderLibSubmodule {
 		autoPaste?: boolean,
 		palette?: ColorPalette,
 		sourcePDFFile?: TFile | null,
+		silentAutoPaste: boolean = false,
 	) {
 		if (autoPaste || this.settings.autoPaste) {
-			const success = await this.autoPaste(evaluated, sourcePDFFile);
+			const success = await this.autoPaste(evaluated, sourcePDFFile, silentAutoPaste);
 			if (success) {
 				palette?.setStatus("Link copied & pasted", this.statusDurationMs);
 				if (

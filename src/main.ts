@@ -882,6 +882,40 @@ export default class PDFReader extends Plugin {
 			}),
 		);
 
+		this.registerEvent(
+			this.on("pdf-reader:annotation-modified", async ({ file, page, id }) => {
+				const annot = await this.lib.highlight.writeFile.getAnnotation(file, page, id);
+				if (!annot) return;
+
+				const color = this.lib.highlight.writeFile.getColorFromAnnotation(annot);
+				const backlinks = await this.lib.getLatestBacklinksForAnnotation(file, page, id);
+				const namedColor =
+					color &&
+					Object.entries(this.settings.colors).find(([_name, hex]) => {
+						const rgb = this.lib.utils.hexToRgb(hex);
+						return (
+							rgb &&
+							rgb.r === color.r &&
+							rgb.g === color.g &&
+							rgb.b === color.b
+						);
+					})?.[0];
+
+				await Promise.all(
+					Array.from(backlinks).map((cache) =>
+						this.lib.linkUpdater.updateLinkColor(
+							cache,
+							color
+								? namedColor
+									? { type: "name", name: namedColor }
+									: { type: "rgb", rgb: color }
+								: null,
+						),
+					),
+				);
+			}),
+		);
+
 		//
 		// https://github.com/RyotaUshio/obsidian-pdf-reader/issues/285
 		this.registerEvent(
